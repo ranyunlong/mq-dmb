@@ -151,12 +151,12 @@ export function UserManagement() {
                 <TableCell>{user.lastActive}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                    <DropdownMenuTrigger render={(props) => (
+                      <Button {...props} variant="ghost" size="icon">
                         <MoreHorizontal className="h-4 w-4" />
                         <span className="sr-only">{t("Open menu")}</span>
                       </Button>
-                    </DropdownMenuTrigger>
+                    )} />
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>{t("Actions")}</DropdownMenuLabel>
                       <DropdownMenuItem>{t("Edit")}</DropdownMenuItem>

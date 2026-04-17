@@ -213,12 +213,12 @@ export function OrganizationManagement() {
           <p className="text-muted-foreground">{t("Manage your organization hierarchy starting from the Tenant level.")}</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
+          <DialogTrigger render={(props) => (
+            <Button {...props} className="gap-2">
               <Plus className="h-4 w-4" />
               {t("Add Department")}
             </Button>
-          </DialogTrigger>
+          )} />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{t("Add Department")}</DialogTitle>
