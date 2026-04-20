@@ -86,6 +86,14 @@ import {
 } from "lucide-react";
 
 // Types
+interface CertificateDetail {
+  cn: string;
+  o: string;
+  ou?: string;
+  c?: string;
+  validUntil: string;
+}
+
 interface Device {
   id: string;
   name: string;
@@ -103,6 +111,10 @@ interface Device {
   };
   config: DeviceConfig;
   lastHeartbeat: string;
+  certificates?: {
+    intermediateCa: CertificateDetail;
+    clientCert: CertificateDetail;
+  };
 }
 
 interface DeviceConfig {
@@ -174,6 +186,22 @@ const mockDevices: Device[] = [
       debugMode: false,
     },
     lastHeartbeat: "2024-04-16 10:05:23",
+    certificates: {
+      intermediateCa: {
+        cn: "Intermediate CA G1",
+        o: "Global Security",
+        ou: "Trust Services",
+        c: "US",
+        validUntil: "2028-12-31",
+      },
+      clientCert: {
+        cn: "DEV-001.devices.internal",
+        o: "Global Security",
+        ou: "IT",
+        c: "US",
+        validUntil: "2025-04-15",
+      },
+    },
   },
   {
     id: "DEV-002",
@@ -206,6 +234,22 @@ const mockDevices: Device[] = [
       debugMode: false,
     },
     lastHeartbeat: "2024-04-16 10:04:12",
+    certificates: {
+      intermediateCa: {
+        cn: "Intermediate CA G1",
+        o: "Global Security",
+        ou: "Trust Services",
+        c: "US",
+        validUntil: "2028-12-31",
+      },
+      clientCert: {
+        cn: "DEV-002.devices.internal",
+        o: "Global Security",
+        ou: "IT",
+        c: "US",
+        validUntil: "2025-03-20",
+      },
+    },
   },
 ];
 
@@ -709,6 +753,67 @@ export function DeviceManagement() {
                                     <Badge variant={currentDevice.config.remoteLock ? "default" : "secondary"} className="text-[10px] h-5">
                                       {currentDevice.config.remoteLock ? t("Locked") : t("Unlocked")}
                                     </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card className="shadow-sm sm:col-span-2 lg:col-span-3">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                <Link className="h-4 w-4 text-primary" /> {t("Certificates")}
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid grid-cols-1 gap-6">
+                              <div className="space-y-3">
+                                <Label className="text-[12px] md:text-sm font-semibold text-primary">{t("Intermediate CA Certificate")}</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-xl border bg-muted/5">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Common Name (CN)")}</Label>
+                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.intermediateCa.cn}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Organization (O)")}</Label>
+                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.intermediateCa.o}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Unit (OU)")}</Label>
+                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.intermediateCa.ou}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Country (C)")}</Label>
+                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.intermediateCa.c}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Valid Until")}</Label>
+                                    <div className="text-xs md:text-sm font-medium text-amber-600">{currentDevice.certificates?.intermediateCa.validUntil}</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <Label className="text-[12px] md:text-sm font-semibold text-primary">{t("Client Certificate")}</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-xl border bg-muted/5">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Common Name (CN)")}</Label>
+                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.clientCert.cn}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Organization (O)")}</Label>
+                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.clientCert.o}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Unit (OU)")}</Label>
+                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.clientCert.ou}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Country (C)")}</Label>
+                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.clientCert.c}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Valid Until")}</Label>
+                                    <div className="text-xs md:text-sm font-medium text-amber-600">{currentDevice.certificates?.clientCert.validUntil}</div>
                                   </div>
                                 </div>
                               </div>

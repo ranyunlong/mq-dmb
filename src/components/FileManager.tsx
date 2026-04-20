@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { 
   Folder, 
   File, 
@@ -29,7 +30,9 @@ import {
   Scissors,
   ClipboardPaste,
   CheckSquare,
-  Square
+  Square,
+  Palette,
+  Boxes
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,25 +80,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-
-interface FileItem {
-  id: string;
-  name: string;
-  type: "folder" | "image" | "video" | "audio";
-  status?: "uploading" | "failed" | "pending" | "rejected" | "approved";
-  size?: number; // In bytes
-  updatedAt: string;
-  owner: string;
-  parentId: string | null;
-  // New fields
-  approver?: string;
-  approvedAt?: string;
-  duration?: string; // e.g., "00:03:45"
-  bitrate?: string;  // e.g., "15 Mbps"
-  fps?: number;      // e.g., 30
-  codec?: string;    // e.g., "H.264", "AAC"
-  tags?: string[];
-}
+import { FileItem, SKU } from "@/types";
+import { INITIAL_SKUS } from "@/constants";
 
 const mockFiles: FileItem[] = [
   { id: "1", name: "Marketing Material", type: "folder", updatedAt: "2024-04-16 10:00:00", owner: "Admin", parentId: null, tags: ["marketing", "2024"] },
@@ -115,7 +101,8 @@ const mockFiles: FileItem[] = [
     bitrate: "8 Mbps",
     fps: 24,
     codec: "H.264",
-    tags: ["promo", "video", "spring"]
+    tags: ["promo", "video", "spring"],
+    skuId: "1"
   },
   { 
     id: "4", 
@@ -126,7 +113,8 @@ const mockFiles: FileItem[] = [
     owner: "Designer", 
     parentId: "1", 
     status: "pending",
-    tags: ["web", "design"]
+    tags: ["web", "design"],
+    skuId: "3"
   },
   { 
     id: "7", 
@@ -230,6 +218,28 @@ export function FileManager() {
       default:
         return null;
     }
+  };
+
+  const renderStatusCorner = (status?: FileItem["status"]) => {
+    if (!status) return null;
+    
+    const config: Record<string, { color: string; textColor: string; text: string }> = {
+      uploading: { color: "bg-blue-500", textColor: "text-white", text: t("Uploading") },
+      failed: { color: "bg-red-500", textColor: "text-white", text: t("Failed") },
+      pending: { color: "bg-yellow-500", textColor: "text-yellow-950", text: t("Pending") },
+      rejected: { color: "bg-orange-500", textColor: "text-white", text: t("Rejected") },
+      approved: { color: "bg-emerald-500", textColor: "text-white", text: t("Approved") },
+    };
+    
+    const { color, textColor, text } = config[status] || { color: "bg-gray-500", textColor: "text-white", text: "" };
+    
+    return (
+      <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden pointer-events-none rounded-tr-lg z-20">
+        <div className={`absolute top-2 -right-6 w-20 transform rotate-45 ${color} ${textColor} py-0.5 text-[8px] font-bold text-center shadow-[0_1px_2px_rgba(0,0,0,0.1)] uppercase tracking-wider`}>
+          {text}
+        </div>
+      </div>
+    );
   };
 
   const filteredFiles = React.useMemo(() => {
@@ -670,6 +680,12 @@ export function FileManager() {
             <FolderPlus className="h-4 w-4" />
             <span className="hidden sm:inline">{t("New Folder")}</span>
           </Button>
+          <Link to="/asset-design">
+            <Button variant="outline" size="sm" className="gap-2 h-9 text-primary hover:text-primary-foreground hover:bg-primary border-primary/20">
+              <Palette className="h-4 w-4" />
+              <span className="hidden sm:inline">{t("New Asset")}</span>
+            </Button>
+          </Link>
           <Button size="sm" className="gap-2 h-9" onClick={() => setIsUploadDialogOpen(true)}>
             <Upload className="h-4 w-4" />
             <span className="hidden sm:inline">{t("Upload")}</span>
@@ -702,7 +718,7 @@ export function FileManager() {
                                     onCheckedChange={toggleSelectAll}
                                   />
                                 </TableHead>
-                                <TableHead className="w-[400px]">{t("Name")}</TableHead>
+                                <TableHead className="w-[400px]">{t("File Name")}</TableHead>
                                 <TableHead>{t("Owner")}</TableHead>
                                 <TableHead>{t("Status")}</TableHead>
                                 <TableHead>{t("Updated At")}</TableHead>
@@ -809,9 +825,10 @@ export function FileManager() {
                                   render={(triggerProps) => (
                                     <Card 
                                       {...triggerProps}
-                                      className={`group cursor-pointer hover:border-primary transition-all hover:shadow-md relative ${selectedIds.has(file.id) ? "border-primary ring-1 ring-primary/50" : ""}`}
+                                      className={`group cursor-pointer hover:border-primary transition-all hover:shadow-md relative overflow-hidden ${selectedIds.has(file.id) ? "border-primary ring-1 ring-primary/50" : ""}`}
                                       onClick={() => file.type === "folder" ? setCurrentFolderId(file.id) : setSelectedFile(file)}
                                     >
+                                      {renderStatusCorner(file.status)}
                                       <div 
                                         className={`absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity ${selectedIds.has(file.id) ? "opacity-100" : ""}`}
                                         onClick={(e) => e.stopPropagation()}
@@ -822,9 +839,6 @@ export function FileManager() {
                                         />
                                       </div>
                                       <CardContent className="p-4 flex flex-col items-center gap-3 relative">
-                                        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                                          {file.status && getStatusBadge(file.status)}
-                                        </div>
                                         <div className={`p-4 rounded-xl transition-colors ${file.type === "folder" ? "bg-blue-50 group-hover:bg-blue-100" : "bg-muted/50 group-hover:bg-muted"}`}>
                                           {React.cloneElement(getFileIcon(file.type) as React.ReactElement, { className: "h-8 w-8" })}
                                         </div>
@@ -919,6 +933,26 @@ export function FileManager() {
                   <p className="text-xs text-muted-foreground mt-1 capitalize">{selectedFile.type}</p>
                 </div>
               </div>
+
+              {selectedFile.skuId && (
+                <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between mb-2">
+                     <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{t("Linked SKU")}</span>
+                     <Boxes className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  {(() => {
+                    const sku = INITIAL_SKUS.find(s => s.id === selectedFile.skuId);
+                    return sku ? (
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold font-mono tracking-tight">{sku.code}</p>
+                        <p className="text-xs text-muted-foreground">{sku.name}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">{t("SKU data missing")}</p>
+                    );
+                  })()}
+                </div>
+              )}
 
               <div className="space-y-4 pt-4 border-t">
                 <div className="grid grid-cols-2 gap-y-4 text-xs">

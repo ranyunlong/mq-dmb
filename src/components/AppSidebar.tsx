@@ -14,6 +14,7 @@ import {
   Network,
   Monitor,
   FolderTree,
+  Package,
 } from "lucide-react";
 import {
   Sidebar,
@@ -86,6 +87,11 @@ const items = [
     title: "File Management",
     url: "/files",
     icon: FolderTree,
+  },
+  {
+    title: "SKU Management",
+    url: "/skus",
+    icon: Package,
   },
   {
     title: "Settings",

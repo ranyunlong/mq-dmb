@@ -15,7 +15,12 @@ import {
   ShieldCheck,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  Sparkles,
+  Palette,
+  Layout,
+  Package,
+  Boxes
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -34,6 +39,8 @@ import {
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const data = [
   { name: "Mon", total: 1200, active: 800 },
@@ -109,10 +116,77 @@ export function Dashboard() {
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">{t("Dashboard")}</h1>
-        <p className="text-muted-foreground">
-          {t("Real-time overview of your device network and organization status.")}
-        </p>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight">{t("Dashboard")}</h1>
+          <p className="text-muted-foreground">
+            {t("Real-time overview of your device network and organization status.")}
+          </p>
+        </div>
+      </div>
+
+      {/* Quick Actions / Shortcuts */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <motion.div
+           initial={{ opacity: 0, x: -20 }}
+           animate={{ opacity: 1, x: 0 }}
+           className="relative group overflow-hidden rounded-xl border bg-card p-6 hover:shadow-xl transition-all cursor-pointer bg-gradient-to-br from-primary/5 to-transparent"
+        >
+          <div className="flex flex-col gap-4">
+            <div className="p-3 w-fit rounded-xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+              <Palette className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold">{t("Asset Design")}</h3>
+              <p className="text-xs text-muted-foreground">{t("Create and edit digital content assets")}</p>
+            </div>
+            <Link to="/asset-design" className="absolute inset-0">
+              <span className="sr-only">{t("Go to Asset Design")}</span>
+            </Link>
+          </div>
+          <Sparkles className="absolute -bottom-2 -right-2 h-16 w-16 text-primary/5 group-hover:text-primary/10 transition-colors" />
+        </motion.div>
+
+        <motion.div
+           initial={{ opacity: 0, x: -20 }}
+           animate={{ opacity: 1, x: 0 }}
+           transition={{ delay: 0.1 }}
+           className="relative group overflow-hidden rounded-xl border bg-card p-6 hover:shadow-xl transition-all cursor-pointer bg-gradient-to-br from-blue-500/5 to-transparent"
+        >
+          <div className="flex flex-col gap-4">
+            <div className="p-3 w-fit rounded-xl bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform">
+              <Layout className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold">{t("File Management")}</h3>
+              <p className="text-xs text-muted-foreground">{t("Organize and manage your digital assets")}</p>
+            </div>
+            <Link to="/files" className="absolute inset-0">
+              <span className="sr-only">{t("Go to File Management")}</span>
+            </Link>
+          </div>
+          <Monitor className="absolute -bottom-2 -right-2 h-16 w-16 text-blue-500/5 group-hover:text-blue-500/10 transition-colors" />
+        </motion.div>
+
+        <motion.div
+           initial={{ opacity: 0, x: -20 }}
+           animate={{ opacity: 1, x: 0 }}
+           transition={{ delay: 0.2 }}
+           className="relative group overflow-hidden rounded-xl border bg-card p-6 hover:shadow-xl transition-all cursor-pointer bg-gradient-to-br from-emerald-500/5 to-transparent"
+        >
+          <div className="flex flex-col gap-4">
+            <div className="p-3 w-fit rounded-xl bg-emerald-500/10 text-emerald-500 group-hover:scale-110 transition-transform">
+              <Package className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold">{t("SKU Management")}</h3>
+              <p className="text-xs text-muted-foreground">{t("Define and manage product SKUs and hierarchies")}</p>
+            </div>
+            <Link to="/skus" className="absolute inset-0">
+              <span className="sr-only">{t("Go to SKU Management")}</span>
+            </Link>
+          </div>
+          <Boxes className="absolute -bottom-2 -right-2 h-16 w-16 text-emerald-500/5 group-hover:text-emerald-500/10 transition-colors" />
+        </motion.div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
