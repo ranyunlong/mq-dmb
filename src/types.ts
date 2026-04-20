@@ -23,3 +23,19 @@ export interface FileItem {
   tags?: string[];
   skuId?: string; // Optional binding to a SKU
 }
+
+export type MediaMode = "carousel" | "video" | "image" | "webpage";
+export type ScreenOrientation = "landscape" | "portrait";
+export type AspectRatio = "16:9" | "4:3" | "1:1" | "9:16" | "custom";
+
+export interface MediaItem {
+  id: string;
+  name: string;
+  type: "folder" | "content";
+  mode?: MediaMode;
+  orientation?: ScreenOrientation;
+  aspectRatio?: AspectRatio;
+  designId?: string; // Reference to a .design file/asset
+  parentId: string | null;
+  updatedAt: string;
+}

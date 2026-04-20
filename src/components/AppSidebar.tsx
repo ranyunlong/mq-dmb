@@ -15,6 +15,7 @@ import {
   Monitor,
   FolderTree,
   Package,
+  Layout,
 } from "lucide-react";
 import {
   Sidebar,
@@ -92,6 +93,11 @@ const items = [
     title: "SKU Management",
     url: "/skus",
     icon: Package,
+  },
+  {
+    title: "Media Content",
+    url: "/media-content",
+    icon: Layout,
   },
   {
     title: "Settings",
