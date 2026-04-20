@@ -2,37 +2,38 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
+import { fileURLToPath } from 'node:url';
 
-export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
     build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
+      emptyOutDir: true,
       rollupOptions: {
         output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('xlsx')) return 'vendor-xlsx';
-              if (id.includes('recharts')) return 'vendor-recharts';
-              return 'vendor';
-            }
+          manualChunks: {
+            'vendor-core': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-lib': ['lucide-react', 'i18next', 'react-i18next'],
+            'vendor-utils': ['xlsx', 'recharts', 'clsx', 'tailwind-merge'],
           },
         },
       },
-      chunkSizeWarningLimit: 1000,
-      emptyOutDir: true,
-    },
-    resolve: {
-      alias: {
-        '@': path.resolve(path.dirname(new URL(import.meta.url).pathname), 'src'),
-      },
+      chunkSizeWarningLimit: 2000,
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      port: 5173,
+      host: '0.0.0.0',
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };

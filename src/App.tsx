@@ -13,6 +13,7 @@ import { RoleManagement } from "@/components/RoleManagement";
 import { FileManager } from "@/components/FileManager";
 import { AssetDesign } from "@/components/AssetDesign";
 import { SkuManagement } from "@/components/SkuManagement";
+import { MediaManagement } from "@/components/MediaManagement";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Search, Bell, User, Languages, Moon, Sun, Monitor } from "lucide-react";
@@ -111,6 +112,7 @@ export default function App() {
                     <Route path="/files" element={<FileManager />} />
                     <Route path="/asset-design" element={<AssetDesign />} />
                     <Route path="/skus" element={<SkuManagement />} />
+                    <Route path="/media-content" element={<MediaManagement />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Dashboard />} />
                   </Routes>
