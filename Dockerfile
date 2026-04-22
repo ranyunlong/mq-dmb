@@ -1,0 +1,12 @@
+FROM node:22
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+VOLUME ["/app/dist"]
+
+CMD ["npm", "run", "build"]
