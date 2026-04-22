@@ -16,6 +16,7 @@ import {
   FolderTree,
   Package,
   Layout,
+  CalendarDays
 } from "lucide-react";
 import {
   Sidebar,
@@ -98,6 +99,11 @@ const items = [
     title: "Media Content",
     url: "/media-content",
     icon: Layout,
+  },
+  {
+    title: "Schedule Management",
+    url: "/schedules",
+    icon: CalendarDays,
   },
   {
     title: "Settings",

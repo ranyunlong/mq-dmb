@@ -14,6 +14,9 @@ import { FileManager } from "@/components/FileManager";
 import { AssetDesign } from "@/components/AssetDesign";
 import { SkuManagement } from "@/components/SkuManagement";
 import { MediaManagement } from "@/components/MediaManagement";
+import { ScheduleManagement } from "@/components/ScheduleManagement";
+import { ScheduleCreator } from "@/components/ScheduleCreator";
+import { MediaEditor } from "@/components/MediaEditor";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Search, Bell, User, Languages, Moon, Sun, Monitor } from "lucide-react";
@@ -113,6 +116,9 @@ export default function App() {
                     <Route path="/asset-design" element={<AssetDesign />} />
                     <Route path="/skus" element={<SkuManagement />} />
                     <Route path="/media-content" element={<MediaManagement />} />
+                    <Route path="/media-editor" element={<MediaEditor />} />
+                    <Route path="/schedules" element={<ScheduleManagement />} />
+                    <Route path="/schedules/create" element={<ScheduleCreator />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Dashboard />} />
                   </Routes>

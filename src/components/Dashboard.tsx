@@ -20,7 +20,8 @@ import {
   Palette,
   Layout,
   Package,
-  Boxes
+  Boxes,
+  CalendarDays
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -186,6 +187,27 @@ export function Dashboard() {
             </Link>
           </div>
           <Boxes className="absolute -bottom-2 -right-2 h-16 w-16 text-emerald-500/5 group-hover:text-emerald-500/10 transition-colors" />
+        </motion.div>
+
+        <motion.div
+           initial={{ opacity: 0, x: -20 }}
+           animate={{ opacity: 1, x: 0 }}
+           transition={{ delay: 0.3 }}
+           className="relative group overflow-hidden rounded-xl border bg-card p-6 hover:shadow-xl transition-all cursor-pointer bg-gradient-to-br from-amber-500/5 to-transparent"
+        >
+          <div className="flex flex-col gap-4">
+            <div className="p-3 w-fit rounded-xl bg-amber-500/10 text-amber-500 group-hover:scale-110 transition-transform">
+              <CalendarDays className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold">{t("Schedule Management")}</h3>
+              <p className="text-xs text-muted-foreground">{t("Plan and coordinate content deployment")}</p>
+            </div>
+            <Link to="/schedules" className="absolute inset-0">
+              <span className="sr-only">{t("Go to Schedule Management")}</span>
+            </Link>
+          </div>
+          <CalendarDays className="absolute -bottom-2 -right-2 h-16 w-16 text-amber-500/5 group-hover:text-amber-500/10 transition-colors" />
         </motion.div>
       </div>
 
