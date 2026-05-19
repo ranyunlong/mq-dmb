@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -7,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -80,6 +88,7 @@ import {
   AlertCircle,
   Plus,
   X,
+  Check,
   Layers,
   Link,
   Unlink,
@@ -111,6 +120,7 @@ interface Device {
   };
   config: DeviceConfig;
   lastHeartbeat: string;
+  serialNumber: string;
   certificates?: {
     intermediateCa: CertificateDetail;
     clientCert: CertificateDetail;
@@ -140,6 +150,17 @@ interface MqttMessage {
   payload: string;
   timestamp: string;
   direction: "in" | "out";
+}
+
+interface Screen {
+  id: string;
+  deviceId: string;
+  deviceName: string;
+  tags: string[];
+  status: "online" | "offline";
+  resolution: string;
+  validity: string;
+  screenshot: string;
 }
 
 // Mock Data
@@ -186,6 +207,7 @@ const mockDevices: Device[] = [
       debugMode: false,
     },
     lastHeartbeat: "2024-04-16 10:05:23",
+    serialNumber: "SN-LOB-001-X9",
     certificates: {
       intermediateCa: {
         cn: "Intermediate CA G1",
@@ -234,6 +256,7 @@ const mockDevices: Device[] = [
       debugMode: false,
     },
     lastHeartbeat: "2024-04-16 10:04:12",
+    serialNumber: "SN-CAF-002-Y2",
     certificates: {
       intermediateCa: {
         cn: "Intermediate CA G1",
@@ -259,22 +282,70 @@ const mockMqttMessages: MqttMessage[] = [
   { id: "3", topic: "device/DEV-001/config", payload: '{"brightness": 80}', timestamp: "2024-04-16 10:01:20", direction: "out" },
 ];
 
+const mockScreens: Screen[] = [
+  {
+    id: "SCR-101",
+    deviceId: "DEV-001",
+    deviceName: "Lobby Display 01",
+    tags: ["Main", "4K"],
+    status: "online",
+    resolution: "3840x2160",
+    validity: "2025-12-31",
+    screenshot: "https://picsum.photos/seed/screen1/400/225"
+  },
+  {
+    id: "SCR-102",
+    deviceId: "DEV-001",
+    deviceName: "Lobby Display 01",
+    tags: ["Extended", "HD"],
+    status: "online",
+    resolution: "1920x1080",
+    validity: "2025-12-31",
+    screenshot: "https://picsum.photos/seed/screen102/400/225"
+  },
+  {
+    id: "SCR-201",
+    deviceId: "DEV-002",
+    deviceName: "Cafe Background Music",
+    tags: ["Audio-Only"],
+    status: "offline",
+    resolution: "N/A",
+    validity: "2024-10-15",
+    screenshot: "https://picsum.photos/seed/screen2/400/225"
+  }
+];
+
+const mockOrgs = [
+  { id: "root", name: "Root Organization", parentId: null },
+  { id: "sh", name: "Shanghai Branch", parentId: "root" },
+  { id: "7", name: "Shanghai Flagship Store", parentId: "sh" },
+  { id: "bj", name: "Beijing Branch", parentId: "root" },
+  { id: "bj-01", name: "Beijing CBD Store", parentId: "bj" },
+];
+
 export function DeviceManagement() {
   const { t } = useTranslation();
   const [data, setData] = React.useState<Device[]>(mockDevices);
+  const [screens] = React.useState<Screen[]>(mockScreens);
+  const [viewDimension, setViewDimension] = React.useState<"device" | "screen">("device");
   const [selectedDevice, setSelectedDevice] = React.useState<Device | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [selectedOrg, setSelectedOrg] = React.useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
+  
+  // Organization Cascading State
+  const [selectedOrgPath, setSelectedOrgPath] = React.useState<string[]>([]);
+  const selectedOrg = selectedOrgPath.length > 0 ? selectedOrgPath[selectedOrgPath.length - 1] : null;
   const [newTag, setNewTag] = React.useState("");
   const [groupInput, setGroupInput] = React.useState("");
   const [isRemoteAssistanceOpen, setIsRemoteAssistanceOpen] = React.useState(false);
   const [screenshotLoading, setScreenshotLoading] = React.useState(false);
+  const [activeScreenIndex, setActiveScreenIndex] = React.useState(0);
   const [screenshotUrl, setScreenshotUrl] = React.useState(`https://picsum.photos/seed/device-${Date.now()}/1280/720`);
 
   const refreshScreenshot = () => {
     setScreenshotLoading(true);
     setTimeout(() => {
-      setScreenshotUrl(`https://picsum.photos/seed/device-${Date.now()}/1280/720`);
+      setScreenshotUrl(`https://picsum.photos/seed/device-${activeScreenIndex}-${Date.now()}/1280/720`);
       setScreenshotLoading(false);
     }, 1000);
   };
@@ -312,131 +383,339 @@ export function DeviceManagement() {
     setData(updatedDevices);
   };
 
+  // Helper to get all sub-org IDs recursively
+  const getSubOrgIds = React.useCallback((orgId: string): string[] => {
+    const ids = [orgId];
+    const children = mockOrgs.filter(o => o.parentId === orgId);
+    children.forEach(child => {
+      ids.push(...getSubOrgIds(child.id));
+    });
+    return ids;
+  }, []);
+
+  const selectedOrgIds = React.useMemo(() => {
+    if (!selectedOrg) return null;
+    return getSubOrgIds(selectedOrg);
+  }, [selectedOrg, getSubOrgIds]);
+
   const filteredDevices = React.useMemo(() => data.filter(d => 
     (d.name.toLowerCase().includes(searchQuery.toLowerCase()) || d.id.toLowerCase().includes(searchQuery.toLowerCase())) &&
-    (!selectedOrg || d.orgId === selectedOrg)
-  ), [data, searchQuery, selectedOrg]);
+    (!selectedOrgIds || selectedOrgIds.includes(d.orgId)) &&
+    (selectedTags.length === 0 || selectedTags.every(tag => d.tags.includes(tag)))
+  ), [data, searchQuery, selectedOrgIds, selectedTags]);
+
+  const filteredScreens = React.useMemo(() => screens.filter(s => 
+    (s.id.toLowerCase().includes(searchQuery.toLowerCase()) || s.deviceName.toLowerCase().includes(searchQuery.toLowerCase())) &&
+    (!selectedOrgIds || selectedOrgIds.includes(data.find(d => d.id === s.deviceId)?.orgId || "")) &&
+    (selectedTags.length === 0 || selectedTags.every(tag => s.tags.includes(tag)))
+  ), [screens, data, searchQuery, selectedOrgIds, selectedTags]);
 
   const currentDevice = React.useMemo(() => 
     selectedDevice ? data.find(d => d.id === selectedDevice.id) : null
   , [data, selectedDevice]);
 
+  // Helper for cascading orgs
+  const getOrgLevel = (parentId: string | null) => mockOrgs.filter(o => o.parentId === parentId);
+
+  const allTags = React.useMemo(() => {
+    const deviceTags = data.flatMap(d => d.tags);
+    const screenTags = screens.flatMap(s => s.tags);
+    return Array.from(new Set([...deviceTags, ...screenTags])).sort();
+  }, [data, screens]);
+
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
-      {/* Left Sidebar: Org Tree */}
-      <div className="w-64 border-r bg-card flex flex-col">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold flex items-center gap-2">
-            <FolderTree className="h-4 w-4" />
-            {t("Organization")}
-          </h2>
-        </div>
-        <ScrollArea className="flex-1 p-2">
-          <div className="space-y-1">
-            <Button 
-              variant={selectedOrg === null ? "secondary" : "ghost"} 
-              className="w-full justify-start gap-2 h-9"
-              onClick={() => setSelectedOrg(null)}
-            >
-              <Building className="h-4 w-4" />
-              {t("Root Organization")}
-            </Button>
-            <div className="pl-4 space-y-1">
-              <Button 
-                variant={selectedOrg === "7" ? "secondary" : "ghost"} 
-                className="w-full justify-start gap-2 h-9"
-                onClick={() => setSelectedOrg("7")}
-              >
-                <Monitor className="h-4 w-4" />
-                {t("Shanghai Flagship")}
-              </Button>
-            </div>
-          </div>
-        </ScrollArea>
-      </div>
-
       {/* Main Content: Device List */}
       <div className="flex-1 flex flex-col bg-muted/30">
-        <div className="p-4 border-b bg-card flex items-center justify-between">
-          <div className="flex items-center gap-4 flex-1 max-w-md">
-            <div className="relative w-full">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={t("Search devices by name or ID...")}
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+        <div className="px-4 py-3 border-b bg-card space-y-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <Tabs 
+              value={viewDimension} 
+              onValueChange={(v) => setViewDimension(v as "device" | "screen")}
+              className="w-auto"
+            >
+              <TabsList className="h-9">
+                <TabsTrigger value="device" className="text-xs px-4">{t("Devices")}</TabsTrigger>
+                <TabsTrigger value="screen" className="text-xs px-4">{t("Screens")}</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-medium">{t("Organization")}:</span>
+              <Popover>
+                <PopoverTrigger 
+                  className={cn(buttonVariants({ variant: "outline" }), "h-8 justify-between text-xs min-w-[180px] px-3 font-normal")}
+                >
+                  <div className="flex items-center gap-2 truncate max-w-[240px]">
+                    <Building className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                    <span className="truncate">
+                      {selectedOrgPath.length > 0 
+                        ? selectedOrgPath.map(id => mockOrgs.find(o => o.id === id)?.name).join(" / ")
+                        : t("All Organizations")
+                      }
+                    </span>
+                  </div>
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50 ml-2" />
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[280px]" align="start">
+                  <Command>
+                    <CommandInput placeholder={t("Search Organization...")} className="h-8 text-xs" />
+                    <CommandList className="max-h-[300px]">
+                      <CommandEmpty className="py-2 text-xs">{t("No organization found.")}</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => setSelectedOrgPath([])}
+                          className="text-xs flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Building className="h-3.5 w-3.5" />
+                            {t("All Organizations")}
+                          </div>
+                          {selectedOrgPath.length === 0 && <Check className="h-3 w-3" />}
+                        </CommandItem>
+                      </CommandGroup>
+                      
+                      <div className="border-t">
+                        {/* Nested Selection Logic */}
+                        {(() => {
+                           // This is a simplified tree view for the Cascader
+                           // If more complex nesting is needed, a recursive component would be better
+                           return mockOrgs.filter(o => o.parentId === null).map(rootOrg => (
+                             <React.Fragment key={rootOrg.id}>
+                               <CommandItem
+                                 onSelect={() => setSelectedOrgPath([rootOrg.id])}
+                                 className="text-xs flex items-center justify-between pl-4"
+                               >
+                                 <div className="flex items-center gap-2">
+                                   <FolderTree className="h-3.5 w-3.5" />
+                                   {rootOrg.name}
+                                 </div>
+                                 {selectedOrg === rootOrg.id && <Check className="h-3 w-3" />}
+                               </CommandItem>
+                               {mockOrgs.filter(o => o.parentId === rootOrg.id).map(subOrg => (
+                                 <React.Fragment key={subOrg.id}>
+                                   <CommandItem
+                                     onSelect={() => setSelectedOrgPath([rootOrg.id, subOrg.id])}
+                                     className="text-xs flex items-center justify-between pl-8"
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       <ChevronRight className="h-3 w-3 opacity-30" />
+                                       {subOrg.name}
+                                     </div>
+                                     {selectedOrg === subOrg.id && <Check className="h-3 w-3" />}
+                                   </CommandItem>
+                                   {mockOrgs.filter(o => o.parentId === subOrg.id).map(grandChild => (
+                                     <CommandItem
+                                       key={grandChild.id}
+                                       onSelect={() => setSelectedOrgPath([rootOrg.id, subOrg.id, grandChild.id])}
+                                       className="text-xs flex items-center justify-between pl-12"
+                                     >
+                                       <div className="flex items-center gap-2">
+                                         <ChevronRight className="h-3 w-3 opacity-30" />
+                                         {grandChild.name}
+                                       </div>
+                                       {selectedOrg === grandChild.id && <Check className="h-3 w-3" />}
+                                     </CommandItem>
+                                   ))}
+                                 </React.Fragment>
+                               ))}
+                             </React.Fragment>
+                           ));
+                        })()}
+                      </div>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Tag className="h-4 w-4" />
-              {t("Tags")}
-            </Button>
-            <Button size="sm" className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              {t("Refresh")}
-            </Button>
+
+            <div className="flex items-center gap-0 bg-muted/20 rounded-md overflow-hidden ml-2 border border-transparent focus-within:ring-1 focus-within:ring-primary/20 focus-within:border-primary/20 transition-all">
+              <Popover>
+                <PopoverTrigger className="h-8 border-none bg-transparent text-xs w-[120px] rounded-none focus:ring-0 shadow-none px-3 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <span className="truncate">
+                    {selectedTags.length === 0 ? t("All Tags") : `${t("Tags")}: ${selectedTags.length}`}
+                  </span>
+                  <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[200px]" align="start">
+                  <Command>
+                    <CommandInput placeholder={t("Search Tags...")} className="h-8 text-xs" />
+                    <CommandList>
+                      <CommandEmpty className="py-2 text-xs">{t("No tags found.")}</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => setSelectedTags([])}
+                          className="text-xs flex items-center gap-2"
+                        >
+                          <Checkbox checked={selectedTags.length === 0} readOnly />
+                          {t("All Tags")}
+                        </CommandItem>
+                        {allTags.map(tag => (
+                          <CommandItem
+                            key={tag}
+                            onSelect={() => {
+                              setSelectedTags(prev => 
+                                prev.includes(tag) 
+                                  ? prev.filter(t => t !== tag) 
+                                  : [...prev, tag]
+                              );
+                            }}
+                            className="text-xs flex items-center gap-2"
+                          >
+                            <Checkbox checked={selectedTags.includes(tag)} readOnly />
+                            {tag}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <div className="h-4 w-[1px] bg-border/50 mx-1 shrink-0" />
+              <div className="relative flex-1 min-w-[160px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder={viewDimension === "device" ? t("Search devices...") : t("Search screens...")}
+                  className="pl-9 h-8 text-xs bg-transparent border-none focus-visible:ring-0 shadow-none"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                {t("Tags")}
+              </Button>
+              <Button size="sm" className="h-8 gap-1.5 text-xs">
+                <RefreshCw className="h-3.5 w-3.5" />
+                {t("Refresh")}
+              </Button>
+            </div>
           </div>
         </div>
 
         <ScrollArea className="flex-1 p-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredDevices.map((device) => (
-              <Card 
-                key={device.id} 
-                className="cursor-pointer hover:border-primary transition-colors group relative"
-                onClick={() => setSelectedDevice(device)}
-              >
-                <CardHeader className="p-4 pb-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <Badge variant={device.status === "online" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
-                      {device.status === "online" ? t("Online") : t("Offline")}
-                    </Badge>
-                    <div className="text-[10px] text-muted-foreground font-mono">{device.id}</div>
-                  </div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    {device.type === "media" ? <Video className="h-4 w-4 text-blue-500" /> : <Music className="h-4 w-4 text-purple-500" />}
-                    <span className="truncate">{device.name}</span>
-                  </CardTitle>
-                  <div className="flex items-center justify-between mt-1">
-                    <CardDescription className="text-xs truncate flex-1">{device.orgName}</CardDescription>
-                    {device.groupId && (
-                      <Badge variant="outline" className="text-[9px] h-4 px-1 gap-1 border-primary/30 text-primary bg-primary/5 shrink-0 ml-2">
-                        <Layers className="h-2.5 w-2.5" />
-                        {device.groupId}
+          {viewDimension === "device" ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredDevices.map((device) => (
+                <Card 
+                  key={device.id} 
+                  className="cursor-pointer hover:border-primary transition-colors group relative"
+                  onClick={() => setSelectedDevice(device)}
+                >
+                  <CardHeader className="p-4 pb-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <Badge variant={device.status === "online" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                        {device.status === "online" ? t("Online") : t("Offline")}
                       </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {device.tags.map(tag => (
-                      <Badge key={tag} variant="outline" className="text-[10px] font-normal">
-                        {tag}
+                      <div className="text-[10px] text-muted-foreground font-mono">{device.id}</div>
+                    </div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      {device.type === "media" ? <Video className="h-4 w-4 text-blue-500" /> : <Music className="h-4 w-4 text-purple-500" />}
+                      <span className="truncate">{device.name}</span>
+                    </CardTitle>
+                    <div className="flex items-center justify-between mt-1">
+                      <CardDescription className="text-xs truncate flex-1">{device.orgName}</CardDescription>
+                      {device.groupId && (
+                        <Badge variant="outline" className="text-[9px] h-4 px-1 gap-1 border-primary/30 text-primary bg-primary/5 shrink-0 ml-2">
+                          <Layers className="h-2.5 w-2.5" />
+                          {device.groupId}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {device.tags.map(tag => (
+                        <Badge key={tag} variant="outline" className="text-[10px] font-normal">
+                          {tag}
+                        </Badge>
+                      ))}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-5 w-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDevice(device);
+                        }}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground border-t pt-3">
+                      <div>{t("Model")}: {device.basicInfo.model}</div>
+                      <div>{t("Client Version")}: {device.basicInfo.version}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredScreens.map((screen) => (
+                <Card key={screen.id} className="overflow-hidden border-2 hover:border-primary transition-all group">
+                  <div className="aspect-video relative bg-muted group-hover:brightness-75 transition-all cursor-pointer">
+                    <img 
+                      src={screen.screenshot} 
+                      alt={screen.id} 
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute top-2 right-2">
+                      <Badge variant={screen.status === "online" ? "default" : "secondary"} className="text-[10px]">
+                        {screen.status === "online" ? t("Online") : t("Offline")}
                       </Badge>
-                    ))}
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-5 w-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDevice(device);
-                      }}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="secondary" size="sm" className="gap-2 font-bold shadow-lg">
+                        <Maximize className="h-4 w-4" />
+                        {t("View Full Screenshot")}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground border-t pt-3">
-                    <div>{t("Model")}: {device.basicInfo.model}</div>
-                    <div>{t("Client Version")}: {device.basicInfo.version}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <CardHeader className="p-4 pb-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-[10px] text-primary font-bold tracking-widest uppercase">{t("Screen Number")}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">{screen.id}</div>
+                    </div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MonitorPlay className="h-4 w-4 text-blue-500" />
+                      <span className="truncate">{screen.id}</span>
+                    </CardTitle>
+                    <div className="mt-2 space-y-1">
+                      <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{t("Belongs to Device")}</div>
+                      <CardDescription className="text-xs truncate font-semibold text-foreground flex items-center gap-1">
+                         <Cpu className="h-3 w-3" />
+                         {screen.deviceName}
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2">
+                    <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-muted-foreground uppercase font-bold">{t("Resolution")}</div>
+                        <div className="text-xs font-mono font-bold">{screen.resolution}</div>
+                      </div>
+                      <div className="space-y-1 text-right">
+                        <div className="text-[9px] text-muted-foreground uppercase font-bold">{t("Registration Validity")}</div>
+                        <div className="text-xs font-bold text-amber-600">{screen.validity}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-4">
+                      {screen.tags.map(tag => (
+                        <Badge key={tag} variant="secondary" className="text-[9px] font-normal bg-primary/5 text-primary border-none">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </div>
 
@@ -547,7 +826,7 @@ export function DeviceManagement() {
                             { label: t("Brand"), value: currentDevice.basicInfo.brand, icon: Building },
                             { label: t("Model"), value: currentDevice.basicInfo.model, icon: Settings },
                             { label: t("IP Address"), value: currentDevice.config.ip, icon: Network },
-                            { label: t("Last Heartbeat"), value: currentDevice.lastHeartbeat, icon: Activity },
+                            { label: t("Serial Number"), value: currentDevice.serialNumber, icon: Activity },
                           ].map((item, i) => (
                             <div key={i} className="p-4 border rounded-xl bg-card shadow-sm flex flex-col justify-center min-w-0">
                               <div className="flex items-center gap-2 text-[10px] md:text-xs text-muted-foreground mb-1.5">
@@ -760,63 +1039,83 @@ export function DeviceManagement() {
                           </Card>
 
                           <Card className="shadow-sm sm:col-span-2 lg:col-span-3">
-                            <CardHeader className="pb-3">
+                            <CardHeader className="pb-3 border-b mb-6">
                               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                                 <Link className="h-4 w-4 text-primary" /> {t("Certificates")}
                               </CardTitle>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-1 gap-6">
-                              <div className="space-y-3">
-                                <Label className="text-[12px] md:text-sm font-semibold text-primary">{t("Intermediate CA Certificate")}</Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-xl border bg-muted/5">
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Common Name (CN)")}</Label>
-                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.intermediateCa.cn}</div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Organization (O)")}</Label>
-                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.intermediateCa.o}</div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Unit (OU)")}</Label>
-                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.intermediateCa.ou}</div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Country (C)")}</Label>
-                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.intermediateCa.c}</div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Valid Until")}</Label>
-                                    <div className="text-xs md:text-sm font-medium text-amber-600">{currentDevice.certificates?.intermediateCa.validUntil}</div>
-                                  </div>
-                                </div>
-                              </div>
+                            <CardContent className="space-y-12">
+                              {(() => {
+                                const deviceScreens = screens.filter(s => s.deviceId === currentDevice.id);
+                                return deviceScreens.map((screen, idx) => (
+                                  <div key={screen.id} className="space-y-6">
+                                    <div className="flex items-center gap-3">
+                                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                                        {idx + 1}
+                                      </div>
+                                      <div>
+                                        <h4 className="text-sm font-bold flex items-center gap-2">
+                                          {t("Screen")} {idx + 1} {t("Certificate")}
+                                        </h4>
+                                        <p className="text-[10px] text-muted-foreground font-mono">{screen.id}</p>
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-4 border-l-2 border-muted border-dashed ml-4">
+                                      <div className="space-y-3">
+                                        <Label className="text-[12px] md:text-sm font-semibold text-primary">{t("Intermediate CA Certificate")}</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 p-4 rounded-xl border bg-muted/5">
+                                          <div className="space-y-1 overflow-hidden">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Common Name (CN)")}</Label>
+                                            <div className="text-xs md:text-sm font-medium truncate" title={currentDevice.certificates?.intermediateCa.cn}>{currentDevice.certificates?.intermediateCa.cn}</div>
+                                          </div>
+                                          <div className="space-y-1 overflow-hidden">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Organization (O)")}</Label>
+                                            <div className="text-xs md:text-sm font-medium truncate" title={currentDevice.certificates?.intermediateCa.o}>{currentDevice.certificates?.intermediateCa.o}</div>
+                                          </div>
+                                          <div className="space-y-1 overflow-hidden">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Unit (OU)")}</Label>
+                                            <div className="text-xs md:text-sm font-medium truncate" title={currentDevice.certificates?.intermediateCa.ou}>{currentDevice.certificates?.intermediateCa.ou}</div>
+                                          </div>
+                                          <div className="space-y-1 overflow-hidden">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Country (C)")}</Label>
+                                            <div className="text-xs md:text-sm font-medium truncate" title={currentDevice.certificates?.intermediateCa.c || "US"}>{currentDevice.certificates?.intermediateCa.c || "US"}</div>
+                                          </div>
+                                          <div className="space-y-1 sm:col-span-2 border-t pt-2 mt-1">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Valid Until")}</Label>
+                                            <div className="text-xs md:text-sm font-medium text-amber-600">{currentDevice.certificates?.intermediateCa.validUntil}</div>
+                                          </div>
+                                        </div>
+                                      </div>
 
-                              <div className="space-y-3">
-                                <Label className="text-[12px] md:text-sm font-semibold text-primary">{t("Client Certificate")}</Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-xl border bg-muted/5">
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Common Name (CN)")}</Label>
-                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.clientCert.cn}</div>
+                                      <div className="space-y-3">
+                                        <Label className="text-[12px] md:text-sm font-semibold text-primary">{t("Client Certificate")}</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 p-4 rounded-xl border bg-muted/5">
+                                          <div className="space-y-1 overflow-hidden">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Common Name (CN)")}</Label>
+                                            <div className="text-xs md:text-sm font-medium truncate" title={`${screen.id}.cert.internal`}>{screen.id}.cert.internal</div>
+                                          </div>
+                                          <div className="space-y-1 overflow-hidden">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Organization (O)")}</Label>
+                                            <div className="text-xs md:text-sm font-medium truncate" title={currentDevice.certificates?.clientCert.o}>{currentDevice.certificates?.clientCert.o}</div>
+                                          </div>
+                                          <div className="space-y-1 overflow-hidden">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Unit (OU)")}</Label>
+                                            <div className="text-xs md:text-sm font-medium truncate" title={currentDevice.certificates?.clientCert.ou}>{currentDevice.certificates?.clientCert.ou}</div>
+                                          </div>
+                                          <div className="space-y-1 overflow-hidden">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Country (C)")}</Label>
+                                            <div className="text-xs md:text-sm font-medium truncate" title={currentDevice.certificates?.clientCert.c || "US"}>{currentDevice.certificates?.clientCert.c || "US"}</div>
+                                          </div>
+                                          <div className="space-y-1 sm:col-span-2 border-t pt-2 mt-1">
+                                            <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Valid Until")}</Label>
+                                            <div className="text-xs md:text-sm font-medium text-amber-600">{currentDevice.certificates?.clientCert.validUntil}</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Organization (O)")}</Label>
-                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.clientCert.o}</div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Unit (OU)")}</Label>
-                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.clientCert.ou}</div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Country (C)")}</Label>
-                                    <div className="text-xs md:text-sm font-medium">{currentDevice.certificates?.clientCert.c}</div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] md:text-xs text-muted-foreground">{t("Valid Until")}</Label>
-                                    <div className="text-xs md:text-sm font-medium text-amber-600">{currentDevice.certificates?.clientCert.validUntil}</div>
-                                  </div>
-                                </div>
-                              </div>
+                                ));
+                              })()}
                             </CardContent>
                           </Card>
 
@@ -894,30 +1193,55 @@ export function DeviceManagement() {
                           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
                             {/* Screenshot Section (2/3 width on lg) */}
                             <div className="lg:col-span-2 space-y-4">
-                              <div className="flex items-center justify-between">
+                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <h3 className="text-sm md:text-base font-bold flex items-center gap-2 text-primary">
                                   <Camera className="h-5 w-5" /> {t("Screen Screenshot")}
                                 </h3>
-                                <div className="flex items-center gap-2">
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="h-8 px-3 gap-2"
-                                    onClick={refreshScreenshot}
-                                    disabled={screenshotLoading}
-                                  >
-                                    <RefreshCw className={`h-3.5 w-3.5 ${screenshotLoading ? 'animate-spin' : ''}`} />
-                                    {t("Refresh Screenshot")}
-                                  </Button>
-                                  <Button 
-                                    variant="default" 
-                                    size="sm" 
-                                    className="h-8 px-3 gap-2 bg-primary hover:bg-primary/90"
-                                    onClick={() => setIsRemoteAssistanceOpen(true)}
-                                  >
-                                    <MonitorPlay className="h-3.5 w-3.5" />
-                                    {t("Remote Assistance")}
-                                  </Button>
+
+                                <div className="flex items-center gap-4">
+                                  {/* Screen Switcher */}
+                                  <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border">
+                                    {[0, 1].map((idx) => (
+                                      <Button
+                                        key={idx}
+                                        variant={activeScreenIndex === idx ? "secondary" : "ghost"}
+                                        size="sm"
+                                        className={cn(
+                                          "h-7 px-3 text-[10px] font-bold uppercase tracking-wider transition-all",
+                                          activeScreenIndex === idx ? "bg-background shadow-sm" : "text-muted-foreground"
+                                        )}
+                                        onClick={() => {
+                                          setActiveScreenIndex(idx);
+                                          setScreenshotUrl(`https://picsum.photos/seed/device-${idx}-${Date.now()}/1280/720`);
+                                        }}
+                                      >
+                                        <MonitorPlay className="h-3 w-3 mr-1.5" />
+                                        {t("Screen")} {idx + 1}
+                                      </Button>
+                                    ))}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="h-8 px-3 gap-2"
+                                      onClick={refreshScreenshot}
+                                      disabled={screenshotLoading}
+                                    >
+                                      <RefreshCw className={`h-3.5 w-3.5 ${screenshotLoading ? 'animate-spin' : ''}`} />
+                                      {t("Refresh")}
+                                    </Button>
+                                    <Button 
+                                      variant="default" 
+                                      size="sm" 
+                                      className="h-8 px-3 gap-2 bg-primary hover:bg-primary/90"
+                                      onClick={() => setIsRemoteAssistanceOpen(true)}
+                                    >
+                                      <MonitorPlay className="h-3.5 w-3.5" />
+                                      {t("Remote Assistance")}
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
                               
