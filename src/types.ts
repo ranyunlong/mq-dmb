@@ -61,6 +61,7 @@ export interface ScheduleLog {
 
 export interface Schedule {
   id: string;
+  name?: string;
   startTime: string;
   endTime: string;
   mediaId: string; // Reference to MediaItem
@@ -76,4 +77,11 @@ export interface Schedule {
   totalTargets: number; // For batch publishing progress (e.g., 10000 stores)
   completedTargets: number;
   publishLogs?: ScheduleLog[];
+  screens?: string[];
+  screenSchedules?: Record<string, Record<number, string>>;
+  selectedDate?: string;
+  screenSchedulesByDate?: Record<string, {
+    screens: string[];
+    screenSchedules: Record<string, Record<number, string>>;
+  }>;
 }

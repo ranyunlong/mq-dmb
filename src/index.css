@@ -128,3 +128,44 @@
     @apply font-sans;
     }
 }
+
+/* Custom resets & professional dark theme overrides for @xzdarcy/react-timeline-editor */
+.timeline-editor {
+  background-color: #0c0d0f !important;
+  font-family: var(--font-sans) !important;
+  width: 100% !important;
+}
+
+.timeline-editor-time-area {
+  background-color: #131417 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  height: 32px !important;
+}
+
+.timeline-editor-time-unit {
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.timeline-editor-time-unit-scale {
+  color: rgba(255, 255, 255, 0.4) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  font-family: inherit !important;
+}
+
+.timeline-editor-edit-row {
+  background-image: linear-gradient(#0c0d0f, #0c0d0f), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 0) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
+}
+
+.timeline-editor-action {
+  user-select: none;
+  height: 28px !important;
+}
+
+ 
+
+.timeline-editor-cursor {
+  border-left-color: var(--primary) !important;
+  border-right-color: var(--primary) !important;
+}
