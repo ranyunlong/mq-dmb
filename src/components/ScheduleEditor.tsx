@@ -31,6 +31,10 @@ import { INITIAL_SCHEDULES } from "@/constants";
 
 import { Timeline, TimelineState } from "@xzdarcy/react-timeline-editor";
 import "@xzdarcy/react-timeline-editor/dist/react-timeline-editor.css";
+import { AutoSizer, Grid, List, ScrollSync } from "react-virtualized";
+import "react-virtualized/styles.css";
+
+
 
 // Interface matched structurally from react-timeline-editor
 interface TimelineAction {
@@ -97,6 +101,7 @@ export function ScheduleEditor() {
     screens: string[];
     screenSchedules: Record<string, Record<number, string>>;
   }>>({});
+  const [scheduleDrawerOpen, setScheduleDrawerOpen] = React.useState<boolean>(false);
 
   // Mapped effects record for the timeline component
   const timelineEffects: Record<string, TimelineEffect> = React.useMemo(() => ({
@@ -514,10 +519,10 @@ export function ScheduleEditor() {
   }, [zoom, containerWidth, headerWidth]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#f8fafc] dark:bg-zinc-950 transition-colors">
+    <div className="flex-1 flex flex-col h-full bg-[#f8fafc] dark:bg-zinc-950 transition-colors relative">
       
       {/* Upper Navigation Bar */}
-      <div className="border-b bg-card px-4 py-4 md:px-6 flex items-center justify-between gap-4">
+      <div className="border-b bg-card px-4 py-4 md:px-6 flex items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3">
           <Button 
             variant="ghost" 
@@ -559,11 +564,11 @@ export function ScheduleEditor() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="w-full p-4 md:p-6 pb-20 space-y-6">
+      <ScrollArea className="flex-1 relative">
+        <div className="w-full h-full p-4 md:p-6 pb-20 space-y-6 relative">
           
           {/* UNIFIED MONITOR & TIMELINE SYSTEM CONSOLE */}
-          <div className="border rounded-lg border-[#1e2025] bg-[#0c0d0f] overflow-hidden relative shadow-2xl flex flex-col">
+          <div className="border h-full rounded-lg border-[#1e2025] bg-[#0c0d0f] overflow-hidden relative shadow-2xl flex flex-1 flex-col">
             
             {/* 32px height Consolidated Title Bar */}
             <div className="h-[32px] bg-[#0c0d0f] border-b border-[#1e2025] px-3 flex items-center justify-between text-xs text-zinc-350 font-medium select-none shrink-0 gap-3">
@@ -574,6 +579,17 @@ export function ScheduleEditor() {
                     <Tv className="h-3.5 w-3.5 text-primary" />
                     <span>联动播控排期</span>
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setScheduleDrawerOpen(true)}
+                    className="h-6 w-6 rounded text-zinc-400 hover:text-primary hover:bg-zinc-800/50 border-none"
+                    title="插入日程"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
                   
                   <div className="h-4 w-[1px] bg-zinc-800 shrink-0" />
                   
@@ -649,131 +665,140 @@ export function ScheduleEditor() {
                     <span>添加屏幕</span>
                   </Button>
                 </div>
-              </div>
+            </div>
 
               {/* Seamless Screen Previews Region */}
-              <div className="p-4 bg-[#0c0d0f] border-b border-[#1e2025]">
-                <div className="max-h-[450px] overflow-y-auto pr-1 select-none scrollbar-thin scrollbar-thumb-zinc-850 scrollbar-track-transparent">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-5">
-                    {timelineData.filter(item => !hiddenScreens[item.id]).length === 0 ? (
-                      <div className="col-span-full py-6 text-center bg-zinc-900/40 rounded-xl border border-zinc-800/45 p-4 flex flex-col items-center justify-center space-y-1.5">
-                        <Tv className="h-5 w-5 text-zinc-500" />
-                        <p className="text-[11px] font-black text-zinc-400">{t("All terminal screens are currently toggled hidden") || "所有屏幕终端均已被隐藏预览"}</p>
-                        <p className="text-[9px] text-zinc-650">{t("Click the 'Eye' icon on the left timeline row headers to reveal") || "点击下方时间轴左侧各屏幕前的眼睛图标即可重新显示"}</p>
-                      </div>
-                    ) : (
-                      timelineData.map((item) => {
-                        const isHidden = hiddenScreens[item.id];
-                        if (isHidden) return null;
+            <div className="p-4 bg-[#0c0d0f] border-b border-[#1e2025] flex-1">
+              <div className="overflow-y-auto pr-1 select-none scrollbar-thin scrollbar-thumb-zinc-850 scrollbar-track-transparent">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-5">
+                  {timelineData.filter(item => !hiddenScreens[item.id]).length === 0 ? (
+                    <div className="col-span-full py-6 text-center bg-zinc-900/40 rounded-xl border border-zinc-800/45 p-4 flex flex-col items-center justify-center space-y-1.5">
+                      <Tv className="h-5 w-5 text-zinc-500" />
+                      <p className="text-[11px] font-black text-zinc-400">{t("All terminal screens are currently toggled hidden") || "所有屏幕终端均已被隐藏预览"}</p>
+                      <p className="text-[9px] text-zinc-650">{t("Click the 'Eye' icon on the left timeline row headers to reveal") || "点击下方时间轴左侧各屏幕前的眼睛图标即可重新显示"}</p>
+                    </div>
+                  ) : (
+                    timelineData.map((item) => {
+                      const isHidden = hiddenScreens[item.id];
+                      if (isHidden) return null;
 
-                        // Find what is playing at previewTime
-                        const currentPlayingName = screenSchedules[item.id]?.[previewTime] || "OFF";
-                        const mediaItem = AVAILABLE_CONTENTS.find(c => c.name === currentPlayingName);
-                        const isOff = currentPlayingName === "OFF";
+                      // Find what is playing at previewTime
+                      const currentPlayingName = screenSchedules[item.id]?.[previewTime] || "OFF";
+                      const mediaItem = AVAILABLE_CONTENTS.find(c => c.name === currentPlayingName);
+                      const isOff = currentPlayingName === "OFF";
 
-                        return (
-                          <div 
-                            key={`preview_${item.id}`} 
-                            className="flex flex-col space-y-2 animate-in fade-in duration-200"
-                          >
-                            {/* 16:9 Screen container */}
-                            <div className="aspect-video w-full rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden relative shadow-md group">
-                              
-                              {/* Simulation Inner Screen */}
-                              {isOff ? (
-                                <div className="absolute inset-0 bg-[#0a0a0c] flex flex-col items-center justify-center p-3 text-center select-none animate-in fade-in">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-red-500/80 animate-ping absolute top-2 right-2" />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-red-600 absolute top-2 right-2" />
-                                  <Tv className="h-5 w-5 text-zinc-800 mb-1.5" />
-                                  <span className="text-[9px] font-mono font-bold text-zinc-650 tracking-wider">熄屏 / OFF</span>
-                                </div>
-                              ) : (
-                                <div className="absolute inset-0 flex flex-col justify-between p-3 select-none overflow-hidden relative">
-                                  {/* Visual Background Pattern based on Media Type */}
-                                  {mediaItem?.type === "video" && (
-                                    <>
-                                      <div className="absolute inset-0 bg-gradient-to-tr from-emerald-950/90 to-teal-900/60 opacity-95" />
-                                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-teal-500/10 via-transparent to-transparent" />
-                                      <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
-                                        <span className="text-[8px] font-mono text-emerald-400">VIDEO</span>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {mediaItem?.type === "image" && (
-                                    <>
-                                      <div className="absolute inset-0 bg-gradient-to-tr from-orange-950/95 to-amber-900/60 opacity-95" />
-                                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent" />
-                                      <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
-                                        <span className="text-[8px] font-mono text-amber-500">POSTER</span>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {mediaItem?.type === "notice" && (
-                                    <>
-                                      <div className="absolute inset-0 bg-gradient-to-tr from-red-950/95 to-rose-900/60 opacity-95 border border-red-500/10" />
-                                      <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
-                                        <span className="text-[8px] font-mono text-rose-400">NOTICE</span>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {mediaItem?.type === "interactive" && (
-                                    <>
-                                      <div className="absolute inset-0 bg-gradient-to-tr from-[#0a051d] to-[#12052c] opacity-95" />
-                                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-500/15 via-transparent to-transparent" />
-                                      <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-65">
-                                        <span className="text-[8px] font-mono text-cyan-400">H5 APP</span>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {mediaItem?.type === "default" && (
-                                    <>
-                                      <div className="absolute inset-0 bg-gradient-to-tr from-zinc-900 to-zinc-800 opacity-95" />
-                                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
-                                      <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-50">
-                                        <span className="text-[8px] font-mono text-zinc-500">STREAM</span>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {/* Content Display inside Screen */}
-                                  <div className="relative z-10 flex flex-col h-full justify-between">
-                                    <div className="flex justify-between items-center w-full">
-                                      <span className="text-[8px] font-black text-white/60 bg-black/55 px-1.5 py-0.5 rounded border border-white/5 uppercase font-mono">{mediaItem?.type || "unknown"}</span>
-                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      return (
+                        <div 
+                          key={`preview_${item.id}`} 
+                          className="flex flex-col space-y-2 animate-in fade-in duration-200"
+                        >
+                          {/* 16:9 Screen container */}
+                          <div className="aspect-video w-full rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden relative shadow-md group">
+                            
+                            {/* Simulation Inner Screen */}
+                            {isOff ? (
+                              <div className="absolute inset-0 bg-[#0a0a0c] flex flex-col items-center justify-center p-3 text-center select-none animate-in fade-in">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500/80 animate-ping absolute top-2 right-2" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-600 absolute top-2 right-2" />
+                                <Tv className="h-5 w-5 text-zinc-800 mb-1.5" />
+                                <span className="text-[9px] font-mono font-bold text-zinc-650 tracking-wider">熄屏 / OFF</span>
+                              </div>
+                            ) : (
+                              <div className="absolute inset-0 flex flex-col justify-between p-3 select-none overflow-hidden relative">
+                                {/* Visual Background Pattern based on Media Type */}
+                                {mediaItem?.type === "video" && (
+                                  <>
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-950/90 to-teal-900/60 opacity-95" />
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-teal-500/10 via-transparent to-transparent" />
+                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
+                                      <span className="text-[8px] font-mono text-emerald-400">VIDEO</span>
                                     </div>
+                                  </>
+                                )}
 
-                                    <div className="my-auto py-1 text-center">
-                                      <p className="text-[10px] md:text-[11px] font-black text-white tracking-tight leading-snug line-clamp-2 px-1 text-shadow-md">
-                                        {currentPlayingName}
-                                      </p>
+                                {mediaItem?.type === "image" && (
+                                  <>
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-orange-950/95 to-amber-900/60 opacity-95" />
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent" />
+                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
+                                      <span className="text-[8px] font-mono text-amber-500">POSTER</span>
                                     </div>
+                                  </>
+                                )}
 
-                                    <div className="w-full h-[3px] bg-white/10 rounded-full overflow-hidden shrink-0">
-                                      <div className="h-full bg-primary animate-pulse" style={{ width: '60%' }} />
+                                {mediaItem?.type === "notice" && (
+                                  <>
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-red-950/95 to-rose-900/60 opacity-95 border border-red-500/10" />
+                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
+                                      <span className="text-[8px] font-mono text-rose-400">NOTICE</span>
                                     </div>
+                                  </>
+                                )}
+
+                                {mediaItem?.type === "interactive" && (
+                                  <>
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-[#0a051d] to-[#12052c] opacity-95" />
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-500/15 via-transparent to-transparent" />
+                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-65">
+                                      <span className="text-[8px] font-mono text-cyan-400">H5 APP</span>
+                                    </div>
+                                  </>
+                                )}
+
+                                {mediaItem?.type === "default" && (
+                                  <>
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-zinc-900 to-zinc-800 opacity-95" />
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
+                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-50">
+                                      <span className="text-[8px] font-mono text-zinc-500">STREAM</span>
+                                    </div>
+                                  </>
+                                )}
+
+                                {/* Content Display inside Screen */}
+                                <div className="relative z-10 flex flex-col h-full justify-between">
+                                  <div className="flex justify-between items-center w-full">
+                                    <span className="text-[8px] font-black text-white/60 bg-black/55 px-1.5 py-0.5 rounded border border-white/5 uppercase font-mono">{mediaItem?.type || "unknown"}</span>
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  </div>
+
+                                  <div className="my-auto py-1 text-center">
+                                    <p className="text-[10px] md:text-[11px] font-black text-white tracking-tight leading-snug line-clamp-2 px-1 text-shadow-md">
+                                      {currentPlayingName}
+                                    </p>
+                                  </div>
+
+                                  <div className="w-full h-[3px] bg-white/10 rounded-full overflow-hidden shrink-0">
+                                    <div className="h-full bg-primary animate-pulse" style={{ width: '60%' }} />
                                   </div>
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
 
-                            {/* Beneath caption label */}
-                            <span className="text-[10.5px] text-center font-extrabold text-[#71717a] dark:text-zinc-400 truncate block leading-none">
-                              {item.id} 屏幕
-                            </span>
+                            {/* Calendar button for chart modal */}
+                            <button
+                              onClick={() => setScheduleDrawerOpen(true)}
+                              className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                              title="View schedule chart"
+                            >
+                              <Calendar className="h-4 w-4 text-white" />
+                            </button>
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
+
+                          {/* Beneath caption label */}
+                          <span className="text-[10.5px] text-center font-extrabold text-[#71717a] dark:text-zinc-400 truncate block leading-none">
+                            {item.id} 屏幕
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
+            </div>
 
               {/* Timeline flex layout with height exactly matches custom timeline editor rows */}
-              <div className="flex h-[240px] relative">
+              <div className="flex h-[240px] relative shrink-0">
               
                 {/* Left sticky column holding screens */}
                 <div
@@ -791,7 +816,7 @@ export function ScheduleEditor() {
                   style={{ overflow: 'overlay' }}
                   onScroll={(e) => {
                     const target = e.target as HTMLDivElement;
-                    timelineState.current.setScrollTop(target.scrollTop);
+                    timelineState.current?.setScrollTop(target.scrollTop);
                   }} 
                   className="mt-[8px] px-[10px] timeline-list flex-1 overflow-y-hidden flex flex-col"
                 >
@@ -845,6 +870,19 @@ export function ScheduleEditor() {
                           }}
                         >
                           <Trash2 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 opacity-0 group-hover:opacity-100 rounded-md hover:bg-primary/20 hover:text-primary text-zinc-400 p-0 shrink-0 transition-all border-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setScheduleDrawerOpen(true);
+                          }}
+                          title="View schedule chart"
+                        >
+                          <Calendar className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
@@ -909,12 +947,222 @@ export function ScheduleEditor() {
                   }}
                 />
               </div>
-
             </div>
 
-            </div>
-
+          </div>
         </div>
+
+        {/* Schedule Insertion Drawer - slides from right */}
+        {scheduleDrawerOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/50  z-40 animate-in fade-in duration-200"
+              onClick={() => setScheduleDrawerOpen(false)}
+            />
+            {/* Drawer panel */}
+            <div className="absolute top-0 right-0 h-full w-[80%] bg-card border-l border-border shadow-2xl z-50 animate-in slide-in-from-right duration-300 flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <h3 className="text-sm font-black uppercase tracking-wide flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-primary" />
+                  插入日程
+                </h3>
+                <button
+                  onClick={() => setScheduleDrawerOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-muted"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden p-4">
+                {(() => {
+                  const DATE_COL_WIDTH = 200;
+                  const HOUR_COL_WIDTH = 56;
+                  const HEADER_HEIGHT = 40;
+                  const HOUR_ROW_HEIGHT = 64;
+
+                  // Generate dates for 1 month (from selectedDate)
+                  const generateMonthDates = () => {
+                    const result: string[] = [];
+                    const baseDate = new Date(selectedDate);
+                    const year = baseDate.getFullYear();
+                    const month = baseDate.getMonth();
+                    const firstDay = new Date(year, month, 1);
+                    const lastDay = new Date(year, month + 2, 0);
+                    for (let d = firstDay.getDate(); d <= lastDay.getDate(); d++) {
+                      const date = new Date(year, month, d);
+                      const y = date.getFullYear();
+                      const m = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      result.push(`${y}-${m}-${day}`);
+                    }
+                    return result;
+                  };
+
+                  const dates = Object.keys(screenSchedulesByDate).sort().length > 0
+                    ? Object.keys(screenSchedulesByDate).sort()
+                    : generateMonthDates();
+ 
+
+                  const TOTAL_WIDTH = dates.length * DATE_COL_WIDTH;
+                  const TOTAL_HEIGHT = 24 * HOUR_ROW_HEIGHT;
+
+                  // Get day of week in Chinese
+                  const getDayName = (dateStr: string) => {
+                    const [y, m, d] = dateStr.split('-').map(Number);
+                    const date = new Date(y, m - 1, d);
+                    const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                    return days[date.getDay()];
+                  };
+
+                  // Get content color
+                  const getContentColor = (content: string) => {
+                    if (content === "OFF") return "bg-zinc-100 dark:bg-zinc-800";
+                    const mediaItem = AVAILABLE_CONTENTS.find(c => c.name === content);
+                    switch (mediaItem?.type) {
+                      case "video": return "bg-emerald-600";
+                      case "image": return "bg-amber-600";
+                      case "notice": return "bg-red-600";
+                      case "interactive": return "bg-cyan-600";
+                      case "default": return "bg-zinc-500";
+                      default: return "bg-zinc-300 dark:bg-zinc-600";
+                    }
+                  };
+
+                  // Cell renderers
+                  const cornerCellRenderer = () => (
+                    <div className="flex items-center justify-center bg-background border-b border-r border-border" style={{ width: HOUR_COL_WIDTH, height: HEADER_HEIGHT }}>
+                      <span className="text-[10px] font-black text-muted-foreground uppercase">时间</span>
+                    </div>
+                  );
+
+                  const dateCellRenderer = ({ columnIndex, style, key  }: { columnIndex: number; style: React.CSSProperties; key: string}) => {
+ 
+                    const date = dates[columnIndex];
+                    return (
+                      <div key={key} className="flex flex-col items-center justify-center border-b border-r border-border bg-background/80" style={style}>
+                        <span className="text-[11px] font-bold text-muted-foreground">{date}</span>
+                        <span className="text-[10px] font-black text-muted-foreground/70">{getDayName(date)}</span>
+                      </div>
+                    );
+                  };
+
+                  const hourRowRenderer = ({ index, key, style }: { index: number; key: string; style: React.CSSProperties }) => (
+                    <div key={key} className="flex items-center bg-background border-b border-r border-border" style={style}>
+                      <span className="text-[11px] font-mono font-bold text-muted-foreground ml-2">
+                        {String(index).padStart(2, '0')}:00
+                      </span>
+                    </div>
+                  );
+
+                  const contentCellRenderer = ({ columnIndex, rowIndex, style, key }: { columnIndex: number; rowIndex: number; style: React.CSSProperties; key: string}) => {
+                    const date = dates[columnIndex];
+                    const hour = rowIndex;
+                    const dayData = screenSchedulesByDate[date];
+                    const screenSched = dayData?.screenSchedules || {};
+                    const firstScreenId = Object.keys(screenSched)[0] || '';
+                    const content = screenSched[firstScreenId]?.[hour] || "OFF";
+                    return (
+                      <div
+                       key={key} 
+                        className={cn(
+                          "flex items-center justify-center text-center cursor-default border-b border-r border-border",
+                          getContentColor(content)
+                        )}
+                        style={style} 
+                      >
+                        {content !== "OFF" && (
+                          <span className="text-[10px] font-bold text-white truncate px-1">
+                            {content.split('.')[0]}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div className="w-full h-full border rounded-xl bg-background/50 overflow-hidden">
+                      <ScrollSync>
+                        {({ onScroll, scrollLeft, scrollTop }) => (
+                          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                            {/* Corner cell - fixed top-left */}
+                            <div style={{ position: 'absolute', left: 0, top: 0, zIndex: 3 }}>
+                              <Grid 
+                                width={HOUR_COL_WIDTH}
+                                height={HEADER_HEIGHT}
+                                columnWidth={HOUR_COL_WIDTH}
+                                rowHeight={HEADER_HEIGHT}
+                                columnCount={1}
+                                rowCount={1}
+                                cellRenderer={cornerCellRenderer}
+                              />
+                            </div>
+                             
+
+                            <AutoSizer>
+                              {({width, height}) => (
+                                <div>
+                                  <div style={{ position: 'absolute', left: 0, top: HEADER_HEIGHT, zIndex: 1 }}>
+                                  <Grid
+                                    overscanRowCount={14}
+                                        overscanColumnCount={7}
+                                    scrollTop={scrollTop} 
+                                    width={HOUR_COL_WIDTH}
+                                    height={height}
+                                    columnWidth={HOUR_COL_WIDTH}
+                                    rowHeight={HOUR_ROW_HEIGHT}
+                                    columnCount={1}
+                                    rowCount={24}
+                                    cellRenderer={({ key, rowIndex, style }) => hourRowRenderer({ index: rowIndex, key, style })}
+                                  />
+                                </div>
+                                    {/* Header row - scrolls horizontally */}
+                                    <div style={{ position: 'absolute', left: HOUR_COL_WIDTH, top: 0, zIndex: 2,  }}>
+                                      <Grid 
+                                       overscanRowCount={1}
+                                        overscanColumnCount={7}
+                                        scrollLeft={scrollLeft}
+                                        onScroll={onScroll} 
+                                        width={width}
+                                        height={HEADER_HEIGHT}
+                                        columnWidth={DATE_COL_WIDTH}
+                                        rowHeight={HEADER_HEIGHT}
+                                        columnCount={dates.length}
+                                        rowCount={1}
+                                        cellRenderer={dateCellRenderer}
+                                      />
+                                    </div>
+                                    {/* Left column - scrolls vertically */}
+                                  
+                                    {/* Main content - scrolls both */}
+                                    <div style={{ position: 'absolute', left: HOUR_COL_WIDTH, top: HEADER_HEIGHT }}>
+                                      <Grid
+                                        overscanRowCount={14}
+                                        overscanColumnCount={7}
+                                        onScroll={onScroll}
+                                        scrollTop={scrollTop} 
+                                        width={width}
+                                        height={height}
+                                        columnWidth={DATE_COL_WIDTH}
+                                        rowHeight={HOUR_ROW_HEIGHT}
+                                        columnCount={dates.length}
+                                        rowCount={24}
+                                        cellRenderer={contentCellRenderer}
+                                      />
+                                    </div>
+                                </div>
+                              )}
+                            </AutoSizer>
+                          </div>
+                        )}
+                      </ScrollSync>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </>
+        )}
       </ScrollArea>
 
       {/* COMPREHENSIVE MODAL BLOCK EDITOR FOR CHOSEN TIMELINE ACTION SCALE */}
