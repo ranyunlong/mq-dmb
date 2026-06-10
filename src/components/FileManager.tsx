@@ -840,7 +840,7 @@ export function FileManager() {
                                       </div>
                                       <CardContent className="p-4 flex flex-col items-center gap-3 relative">
                                         <div className={`p-4 rounded-xl transition-colors ${file.type === "folder" ? "bg-blue-50 group-hover:bg-blue-100" : "bg-muted/50 group-hover:bg-muted"}`}>
-                                          {React.cloneElement(getFileIcon(file.type) as React.ReactElement, { className: "h-8 w-8" })}
+                                          {React.cloneElement(getFileIcon(file.type) as React.ReactElement, { className: "h-8 w-8" } as any)}
                                         </div>
                                         <div className="text-center w-full">
                                           <p className="text-xs font-medium truncate" title={file.name}>{file.name}</p>
@@ -926,7 +926,7 @@ export function FileManager() {
             <div className="p-6 space-y-6">
               <div className="flex flex-col items-center gap-4">
                 <div className="p-8 rounded-2xl bg-muted/50 border border-muted flex items-center justify-center">
-                  {React.cloneElement(getFileIcon(selectedFile.type) as React.ReactElement, { className: "h-16 w-16" })}
+                  {React.cloneElement(getFileIcon(selectedFile.type) as React.ReactElement, { className: "h-16 w-16" } as any)}
                 </div>
                 <div className="text-center w-full">
                   <h4 className="font-bold text-base break-words" title={selectedFile.name}>{selectedFile.name}</h4>

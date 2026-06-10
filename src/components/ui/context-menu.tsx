@@ -19,6 +19,10 @@ function ContextMenuTrigger({ ...props }: ContextMenuPrimitive.Trigger.Props) {
 
 function ContextMenuContent({
   className,
+  align,
+  alignOffset,
+  side,
+  sideOffset,
   ...props
 }: ContextMenuPrimitive.Popup.Props &
   Pick<
@@ -29,7 +33,10 @@ function ContextMenuContent({
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Positioner
         className="isolate z-50 outline-none"
-        {...props}
+        align={align}
+        alignOffset={alignOffset}
+        side={side}
+        sideOffset={sideOffset}
       >
         <ContextMenuPrimitive.Popup
           data-slot="context-menu-content"

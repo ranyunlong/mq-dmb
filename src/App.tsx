@@ -16,6 +16,7 @@ import { SkuManagement } from "@/components/SkuManagement";
 import { MediaManagement } from "@/components/MediaManagement";
 import { ScheduleManagement } from "@/components/ScheduleManagement";
 import { ScheduleCreator } from "@/components/ScheduleCreator";
+import { ScheduleEditor } from "@/components/ScheduleEditor";
 import { MediaEditor } from "@/components/MediaEditor";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -119,6 +120,7 @@ export default function App() {
                     <Route path="/media-editor" element={<MediaEditor />} />
                     <Route path="/schedules" element={<ScheduleManagement />} />
                     <Route path="/schedules/create" element={<ScheduleCreator />} />
+                    <Route path="/schedules/edit/:id" element={<ScheduleEditor />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Dashboard />} />
                   </Routes>
