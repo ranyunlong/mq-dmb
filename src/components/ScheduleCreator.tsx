@@ -1,9 +1,9 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
   History,
   ChevronLeft,
   Filter,
@@ -23,7 +23,8 @@ import {
   Info,
   ZoomIn,
   ZoomOut,
-  Plus
+  Plus,
+  Monitor
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -97,8 +98,11 @@ export function ScheduleCreator() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get("id");
 
-  // Wizard Steps (Step 1, Step 2, and Step 3)
-  const [currentStep, setCurrentStep] = React.useState<1 | 2 | 3>(1);
+  // Wizard Steps (Step 1 and Step 2)
+  const [currentStep, setCurrentStep] = React.useState<1 | 2>(1);
+
+  // Schedule config sub-tab (within Step 2)
+  const [scheduleConfigTab, setScheduleConfigTab] = React.useState<"screen" | "date">("screen");
 
   // Available play resources list
   const AVAILABLE_CONTENTS = React.useMemo(() => [
@@ -198,21 +202,45 @@ export function ScheduleCreator() {
     const saved = localStorage.getItem("schedules");
     const list = saved ? JSON.parse(saved) : INITIAL_SCHEDULES;
 
-    const updated = list.map((s: any) => {
-      if (s.id === editId) {
-        return {
-          ...s,
-          mediaName: formData.name,
-          name: formData.name,
-          startTime: `${startDateStr}T00:00:00Z`,
-          endTime: `${endDateStr}T23:59:59Z`,
-          areas: formData.areas || [],
-        };
-      }
-      return s;
-    });
-
-    localStorage.setItem("schedules", JSON.stringify(updated));
+    if (editId) {
+      // Update existing schedule
+      const updated = list.map((s: any) => {
+        if (s.id === editId) {
+          return {
+            ...s,
+            mediaName: formData.name,
+            name: formData.name,
+            startTime: `${startDateStr}T00:00:00Z`,
+            endTime: `${endDateStr}T23:59:59Z`,
+            areas: formData.areas || [],
+          };
+        }
+        return s;
+      });
+      localStorage.setItem("schedules", JSON.stringify(updated));
+    } else {
+      // Add new schedule to list
+      const newSchedule: any = {
+        id: `s${Date.now()}`,
+        name: formData.name,
+        mediaName: formData.name,
+        startTime: `${startDateStr}T00:00:00Z`,
+        endTime: `${endDateStr}T23:59:59Z`,
+        mediaId: "m1",
+        repeat: "daily",
+        tags: formData.tags || [],
+        status: "valid",
+        publishStatus: "completed",
+        areas: formData.areas || [],
+        publisher: "Admin User",
+        publishedAt: new Date().toISOString(),
+        totalTargets: formData.areas?.length || 1,
+        completedTargets: formData.areas?.length || 1,
+        screens: [],
+        screenSchedules: {},
+      };
+      localStorage.setItem("schedules", JSON.stringify([newSchedule, ...list]));
+    }
     navigate("/schedules");
   };
 
@@ -623,11 +651,35 @@ export function ScheduleCreator() {
       return;
     }
 
-    setCurrentStep(2);
-  };
+    // Create schedule and navigate to edit page
+    const saved = localStorage.getItem("schedules");
+    const list = saved ? JSON.parse(saved) : INITIAL_SCHEDULES;
 
-  const handleGoToStep3 = () => {
-    setCurrentStep(3);
+    const newScheduleId = `s${Date.now()}`;
+    const newSchedule: Schedule = {
+      id: newScheduleId,
+      startTime: `${startDateStr}T00:00:00Z`,
+      endTime: `${endDateStr}T23:59:59Z`,
+      mediaId: "m1",
+      mediaName: formData.name || "未命名日程",
+      name: formData.name || "未命名日程",
+      repeat: "daily",
+      tags: formData.tags || [],
+      status: "valid",
+      publishStatus: "publishing",
+      areas: formData.areas || [],
+      publisher: "Admin User",
+      publishedAt: new Date().toISOString(),
+      totalTargets: formData.areas?.length || 1,
+      completedTargets: 0,
+      screens: [],
+      screenSchedules: {}
+    };
+
+    const nextList = [newSchedule, ...list];
+    localStorage.setItem("schedules", JSON.stringify(nextList));
+
+    navigate(`/schedules/edit/${newScheduleId}`);
   };
 
   const handleCreate = () => {
@@ -674,18 +726,16 @@ export function ScheduleCreator() {
       {/* Top Header Section */}
       <div className="h-16 border-b bg-background flex items-center justify-between px-8 shrink-0 shadow-sm relative z-50">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
-              if (currentStep === 3) {
-                setCurrentStep(2);
-              } else if (currentStep === 2) {
+              if (currentStep === 2) {
                 setCurrentStep(1);
               } else {
                 navigate(-1);
               }
-            }} 
+            }}
             className="gap-2 shrink-0 hover:bg-muted font-bold text-xs uppercase tracking-wider"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -703,42 +753,14 @@ export function ScheduleCreator() {
             "h-5 w-5 rounded-full flex items-center justify-center text-[10px]",
             currentStep === 1 ? "bg-primary text-primary-foreground font-black" : "bg-muted-foreground/20 text-muted-foreground"
           )}>1</span>
-          <span className={currentStep === 1 ? "text-primary font-bold animate-pulse" : "text-muted-foreground"}>{t("Configuration") || "配置信息"}</span>
+          <span className={currentStep === 1 ? "text-primary font-bold animate-pulse" : "text-muted-foreground"}>{t("Basic Config") || "基础配置"}</span>
           <ArrowRight className="h-3 w-3 text-muted-foreground/60 mx-1" />
-          
+
           <span className={cn(
             "h-5 w-5 rounded-full flex items-center justify-center text-[10px]",
             currentStep === 2 ? "bg-primary text-primary-foreground font-black" : "bg-muted-foreground/20 text-muted-foreground"
           )}>2</span>
-          <span className={currentStep === 2 ? "text-primary font-bold animate-pulse" : "text-muted-foreground"}>{t("Screen Layout") || "屏幕排期"}</span>
-          <ArrowRight className="h-3 w-3 text-muted-foreground/60 mx-1" />
-
-          <span className={cn(
-            "h-5 w-5 rounded-full flex items-center justify-center text-[10px]",
-            currentStep === 3 ? "bg-primary text-primary-foreground font-black" : "bg-muted-foreground/20 text-muted-foreground"
-          )}>3</span>
-          <span className={currentStep === 3 ? "text-primary font-bold animate-pulse" : "text-muted-foreground"}>{t("Date Layout") || "日期排期"}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-xl font-bold">
-            {t("Cancel")}
-          </Button>
-          {currentStep === 1 ? (
-            <Button onClick={handleGoToStep2} className="px-6 h-10 rounded-xl font-black uppercase tracking-wider gap-2">
-              <span>{t("Next Step: Screen Schedules") || "下一步：屏幕排期"}</span>
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : currentStep === 2 ? (
-            <Button onClick={handleGoToStep3} className="px-6 h-10 rounded-xl font-black uppercase tracking-wider gap-2">
-              <span>{t("Next Step: Daily Grid") || "下一步：日期排期"}</span>
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button onClick={handleCreate} className="px-8 h-10 rounded-xl font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 hover:shadow-emerald-500/10">
-              {t("Initiate Release") || "开始发布投播"}
-            </Button>
-          )}
+          <span className={currentStep === 2 ? "text-primary font-bold animate-pulse" : "text-muted-foreground"}>{t("Schedule Config") || "日程配置"}</span>
         </div>
       </div>
 
@@ -755,11 +777,9 @@ export function ScheduleCreator() {
                   {t("Deploy Campaign Schedule Form") || "创建日程计划"}
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {currentStep === 1 
+                  {currentStep === 1
                     ? t("Set your campaign identity, schedule timeframe dates and map region hierarchies.") || "设置计划名称、日期范围、并配置发布 门店/区域范围"
-                    : currentStep === 2
-                    ? t("Configure screen terminals and schedule fine-grained content timelines individually.") || "屏幕排期视图：针对目标门店的不同终端（1#、2#、3#屏幕）分配特定的播放内容"
-                    : t("Verify and adjust dynamic schedules day-by-day with customized contents insertion.") || "日期排期视图：沿横向日期（按天）与纵向时刻（0-24小时）编辑特定播控规则"
+                    : t("Configure screen terminals and schedule fine-grained content timelines.") || "配置屏幕终端并设置播控日程内容"
                   }
                 </p>
               </div>
@@ -1114,34 +1134,66 @@ export function ScheduleCreator() {
                </div>
              )}
 
-             {/* STEP 2: SCREEN LAYOUT VIEW */}
+             {/* STEP 2: SCHEDULE CONFIG VIEW */}
             {currentStep === 2 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {/* Image 2 Header layout matching */}
+                {/* Tab switcher for Screen Layout / Date Layout */}
                 <div className="flex justify-between items-center bg-muted/20 border p-4 rounded-2xl">
                   <div className="flex items-center gap-2">
                     <span className="inline-block w-2.5 h-2.5 bg-primary rounded-full animate-ping" />
-                    <h3 className="text-sm font-black text-foreground">创建日程</h3>
+                    <h3 className="text-sm font-black text-foreground">日程配置</h3>
                   </div>
-                  <Button 
-                    type="button"
-                    onClick={() => {
-                      const name = prompt("请输入新屏幕名称", `${screens.length + 1}#`);
-                      if (name) handleAddScreen(name);
-                    }}
-                    className="h-9 gap-1.5 text-xs font-black bg-primary text-primary-foreground hover:bg-primary/95"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>添加屏幕</span>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={scheduleConfigTab === "screen" ? "default" : "outline"}
+                      onClick={() => setScheduleConfigTab("screen")}
+                      className={cn("h-8 gap-1.5 text-xs font-bold", scheduleConfigTab === "screen" ? "bg-primary text-primary-foreground" : "")}
+                    >
+                      <Monitor className="h-3.5 w-3.5" />
+                      <span>屏幕排期</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={scheduleConfigTab === "date" ? "default" : "outline"}
+                      onClick={() => setScheduleConfigTab("date")}
+                      className={cn("h-8 gap-1.5 text-xs font-bold", scheduleConfigTab === "date" ? "bg-emerald-600 text-white" : "")}
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>日期排期</span>
+                    </Button>
+                  </div>
                 </div>
 
-                {/* Toolbar for Zoom & Manual Slider Controls wrapper */}
-                <div className="flex items-center justify-between p-3.5 bg-muted/30 border rounded-2xl gap-4 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
-                    <span>按住 Shift 配合鼠标滚轮，或在移动端手势滑动，可轻松实现横纵双向滚动巡览。</span>
+                {/* SCREEN LAYOUT VIEW */}
+                {scheduleConfigTab === "screen" && (
+                <>
+                  <div className="flex justify-between items-center bg-muted/20 border p-4 rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-xs text-muted-foreground">屏幕视图：针对不同终端分配特定播放内容</span>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const name = prompt("请输入新屏幕名称", `${screens.length + 1}#`);
+                        if (name) handleAddScreen(name);
+                      }}
+                      className="h-9 gap-1.5 text-xs font-black bg-primary text-primary-foreground hover:bg-primary/95"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>添加屏幕</span>
+                    </Button>
                   </div>
+
+                  {/* Toolbar for Zoom & Manual Slider Controls wrapper */}
+                  <div className="flex items-center justify-between p-3.5 bg-muted/30 border rounded-2xl gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
+                      <span>按住 Shift 配合鼠标滚轮，或在移动端手势滑动，可轻松实现横纵双向滚动巡览。</span>
+                    </div>
 
                   {/* ZOOM MODULE */}
                   <div className="flex items-center gap-3 bg-card px-3 py-1.5 rounded-xl border shadow-sm">
@@ -1286,74 +1338,73 @@ export function ScheduleCreator() {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+                </>
+                )}
 
-            {/* STEP 3: DATE LAYOUT VIEW */}
-            {currentStep === 3 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {/* Image 3 Header layout matching */}
-                <div className="flex justify-between items-center bg-muted/20 border p-4 rounded-2xl">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
-                    <h3 className="text-sm font-black text-foreground">创建日程</h3>
-                  </div>
-                  <Button 
-                    type="button"
-                    onClick={() => setBatchInsertModalOpen(true)}
-                    className="h-9 gap-1.5 text-xs font-black bg-emerald-600 text-white hover:bg-emerald-500 shrink-0"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>插入内容</span>
-                  </Button>
-                </div>
-
-                {/* Toolbar for Zoom */}
-                <div className="flex items-center justify-between p-3.5 bg-muted/30 border rounded-2xl gap-4 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                    <span>X轴为播期天数，Y轴为0-24小时播控特定素材时段。可点击任意时刻单元独立改写它。</span>
-                  </div>
-
-                  {/* ZOOM MODULE */}
-                  <div className="flex items-center gap-3 bg-card px-3 py-1.5 rounded-xl border shadow-sm">
-                    <span className="text-[11px] font-bold text-muted-foreground">{t("Grid Size") || "网格缩放"}</span>
+                {/* DATE LAYOUT VIEW */}
+                {scheduleConfigTab === "date" && (
+                <>
+                  <div className="flex justify-between items-center bg-muted/20 border p-4 rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-xs text-muted-foreground">日期视图：按日期和时间段配置播控内容</span>
+                    </div>
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 rounded-md hover:bg-muted"
-                      onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.6))}
-                      disabled={zoom <= 0.6}
+                      onClick={() => setBatchInsertModalOpen(true)}
+                      className="h-9 gap-1.5 text-xs font-black bg-emerald-600 text-white hover:bg-emerald-500 shrink-0"
                     >
-                      <ZoomOut className="h-3.5 w-3.5" />
+                      <Plus className="h-4 w-4" />
+                      <span>插入内容</span>
                     </Button>
-                    <input
-                      type="range"
-                      min="0.6"
-                      max="2.0"
-                      step="0.1"
-                      value={zoom}
-                      onChange={(e) => setZoom(parseFloat(e.target.value))}
-                      className="w-24 accent-primary cursor-pointer h-1 rounded bg-muted"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 rounded-md hover:bg-muted"
-                      onClick={() => setZoom(prev => Math.min(prev + 0.1, 2.0))}
-                      disabled={zoom >= 2.0}
-                    >
-                      <ZoomIn className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="font-mono text-[10px] font-bold w-10 text-right text-primary">
-                      {Math.round(zoom * 100)}%
-                    </span>
                   </div>
-                </div>
 
-                {/* Grid Layout Canvas */}
+                  {/* Toolbar for Zoom */}
+                  <div className="flex items-center justify-between p-3.5 bg-muted/30 border rounded-2xl gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>X轴为播期天数，Y轴为0-24小时播控特定素材时段。可点击任意时刻单元独立改写它。</span>
+                    </div>
+
+                    {/* ZOOM MODULE */}
+                    <div className="flex items-center gap-3 bg-card px-3 py-1.5 rounded-xl border shadow-sm">
+                      <span className="text-[11px] font-bold text-muted-foreground">{t("Grid Size") || "网格缩放"}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-md hover:bg-muted"
+                        onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.6))}
+                        disabled={zoom <= 0.6}
+                      >
+                        <ZoomOut className="h-3.5 w-3.5" />
+                      </Button>
+                      <input
+                        type="range"
+                        min="0.6"
+                        max="2.0"
+                        step="0.1"
+                        value={zoom}
+                        onChange={(e) => setZoom(parseFloat(e.target.value))}
+                        className="w-24 accent-primary cursor-pointer h-1 rounded bg-muted"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-md hover:bg-muted"
+                        onClick={() => setZoom(prev => Math.min(prev + 0.1, 2.0))}
+                        disabled={zoom >= 2.0}
+                      >
+                        <ZoomIn className="h-3.5 w-3.5" />
+                      </Button>
+                      <span className="font-mono text-[10px] font-bold w-10 text-right text-primary">
+                        {Math.round(zoom * 100)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Grid Layout Canvas */}
                 <div className="border rounded-2xl bg-card overflow-hidden shadow-sm relative">
                   <div 
                     ref={scrollRef}
@@ -1473,7 +1524,8 @@ export function ScheduleCreator() {
                     </div>
                   </div>
                 </div>
-              </div>
+            </>)}
+            </div>
             )}
 
             {/* MODAL / DIALOGS SECTION */}
@@ -1655,81 +1707,48 @@ export function ScheduleCreator() {
             <div className="flex justify-between items-center pt-6 mt-6 border-t border-dashed">
               <div>
                 {currentStep === 2 ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setCurrentStep(1)} 
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentStep(1)}
                     className="rounded-xl font-bold gap-2 text-xs h-10 px-5"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     <span>{t("Back to Step 1") || "返回第一步：基础配置"}</span>
                   </Button>
-                ) : currentStep === 3 ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setCurrentStep(2)} 
-                    className="rounded-xl font-bold gap-2 text-xs h-10 px-5"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span>{t("Back to Step 2") || "返回第二步：屏幕配置"}</span>
-                  </Button>
                 ) : null}
               </div>
 
               <div className="flex gap-3">
-                <Button 
-                  variant="ghost" 
-                  size="default" 
-                  onClick={() => navigate(-1)} 
+                <Button
+                  variant="outline"
+                  size="default"
+                  onClick={() => navigate(-1)}
                   className="rounded-xl font-bold px-6 text-xs h-10"
                 >
-                  {t("Cancel")}
+                  {t("Cancel") || "取消"}
                 </Button>
-                
-                {currentStep === 1 ? (
-                  editId ? (
-                    <Button 
-                      size="default" 
-                      onClick={handleSaveBasicInfo} 
-                      className="px-8 h-10 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-400/10 active:scale-95 transition-all gap-2"
-                    >
-                      <Check className="h-4 w-4" />
-                      <span>{t("Save Basic Info") || "保存基本信息"}</span>
-                    </Button>
-                  ) : (
-                    <Button 
-                      size="default" 
-                      onClick={handleGoToStep2} 
-                      className="px-8 h-10 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-primary/5 active:scale-95 transition-all gap-2"
-                    >
-                      <span>{t("Next Step: Screen Grid") || "下一步：屏幕播控"}</span>
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  )
-                ) : currentStep === 2 ? (
-                  <Button 
-                    size="default" 
-                    onClick={handleGoToStep3} 
-                    className="px-8 h-10 rounded-xl text-xs font-black uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/5 active:scale-95 transition-all gap-2"
-                  >
-                    <span>{t("Next Step: Daily Grid") || "下一步：日期播控"}</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button 
-                    size="default" 
-                    onClick={handleCreate} 
-                    className="px-10 h-10 rounded-xl text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/10 active:scale-95 transition-all"
-                  >
-                    {t("Initiate Release") || "开始投播发布"}
-                  </Button>
-                )}
+
+                <Button
+                  size="default"
+                  onClick={currentStep === 1 ? handleGoToStep2 : handleCreate}
+                  className="px-8 h-10 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-primary/5 active:scale-95 transition-all gap-2"
+                >
+                  <span>{currentStep === 1 ? (t("Next Step") || "下一步") : (t("Complete") || "完成")}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  size="default"
+                  variant="outline"
+                  onClick={handleSaveBasicInfo}
+                  className="px-6 h-10 rounded-xl text-xs font-black text-blue-600 border-blue-600/30 hover:bg-blue-50 active:scale-95 transition-all gap-2"
+                >
+                  <span>{t("Save Only") || "仅保存"}</span>
+                </Button>
               </div>
             </div>
-
           </div>
-
         </div>
       </ScrollArea>
     </div>

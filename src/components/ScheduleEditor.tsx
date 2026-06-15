@@ -1,14 +1,14 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
-import { 
-  Plus, 
-  ZoomIn, 
-  ZoomOut, 
-  ChevronLeft, 
-  Sparkles, 
-  X, 
-  Save, 
+import {
+  Plus,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft,
+  Sparkles,
+  X,
+  Save,
   Undo,
   BadgeAlert,
   Terminal,
@@ -30,8 +30,9 @@ import { Schedule } from "@/types";
 import { INITIAL_SCHEDULES } from "@/constants";
 
 import { Timeline, TimelineState } from "@xzdarcy/react-timeline-editor";
-import "@xzdarcy/react-timeline-editor/dist/react-timeline-editor.css";
 import { AutoSizer, Grid, List, ScrollSync } from "react-virtualized";
+import dayjs from 'dayjs'
+import "@xzdarcy/react-timeline-editor/dist/react-timeline-editor.css";
 import "react-virtualized/styles.css";
 
 
@@ -55,6 +56,226 @@ interface TimelineEffect {
   name: string;
 }
 
+// Memoized Program Modal Component
+const ProgramModal = React.memo(({
+  programForm,
+  setProgramForm,
+  onClose,
+  onConfirm
+}: {
+  programForm: {
+    content: string;
+    contentName: string;
+    startHour: number;
+    endHour: number;
+    repeatType: "daily" | "weekly";
+    startDate: string;
+    endDate: string;
+    weeklyDays: number[];
+  };
+  setProgramForm: React.Dispatch<React.SetStateAction<typeof programForm>>;
+  onClose: () => void;
+  onConfirm: () => void;
+}) => {
+  const mediaItems = React.useMemo(() => {
+    const stored = localStorage.getItem("media-items");
+    return stored ? JSON.parse(stored) : [];
+  }, []);
+
+
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 animate-in fade-in duration-200">
+      <div className="bg-card border w-full max-w-lg rounded-[24px] shadow-2xl p-6 relative space-y-4 max-h-[80vh] flex flex-col">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <h3 className="text-sm font-black uppercase text-foreground tracking-wide flex items-center gap-2 border-b pb-3">
+          <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+          <span>添加节目</span>
+        </h3>
+
+        {/* 1. Select Media Content */}
+        <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
+          <label className="text-[10px] font-black uppercase text-muted-foreground/80">选择媒体内容</label>
+          <div className="flex-1 overflow-auto border rounded-xl bg-muted/20">
+            {mediaItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-xs">
+                暂无媒体内容，请先在媒体管理中创建
+              </div>
+            ) : (
+              <div className="p-2 space-y-1">
+                {mediaItems.filter((item: any) => item.type === "content").map((item: any) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setProgramForm({ ...programForm, content: item.id, contentName: item.name })}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 rounded-lg border text-xs font-bold transition-colors text-left",
+                      programForm.content === item.id
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:bg-muted"
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate font-bold">{item.name}</div>
+                      <div className="text-[10px] opacity-60">{item.mode} | {item.aspectRatio}</div>
+                    </div>
+                    {programForm.content === item.id && (
+                      <Badge className="bg-primary-foreground text-primary shrink-0">
+                        已选择
+                      </Badge>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2. Play Time Range */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-muted-foreground/80">播放时间段</label>
+          <div className="flex items-center gap-2">
+            <select
+              value={programForm.startHour}
+              onChange={(e) => setProgramForm({ ...programForm, startHour: parseInt(e.target.value) })}
+              className="flex-1 h-10 rounded-xl border bg-background px-3 text-xs font-bold"
+            >
+              {Array.from({ length: 24 }).map((_, h) => (
+                <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">至</span>
+            <select
+              value={programForm.endHour}
+              onChange={(e) => setProgramForm({ ...programForm, endHour: parseInt(e.target.value) })}
+              className="flex-1 h-10 rounded-xl border bg-background px-3 text-xs font-bold"
+            >
+              {Array.from({ length: 24 }).map((_, h) => (
+                <option key={h + 1} value={h + 1}>{String(h + 1).padStart(2, '0')}:00</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* 3. Repeat Mode */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-muted-foreground/80">重复方式</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setProgramForm({ ...programForm, repeatType: "daily" })}
+              className={cn(
+                "flex-1 h-9 rounded-lg border text-xs font-bold transition-colors",
+                programForm.repeatType === "daily"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:bg-muted"
+              )}
+            >
+              按日
+            </button>
+            <button
+              type="button"
+              onClick={() => setProgramForm({ ...programForm, repeatType: "weekly" })}
+              className={cn(
+                "flex-1 h-9 rounded-lg border text-xs font-bold transition-colors",
+                programForm.repeatType === "weekly"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:bg-muted"
+              )}
+            >
+              按周
+            </button>
+          </div>
+        </div>
+
+        {/* Daily: Date Range */}
+        {programForm.repeatType === "daily" && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-muted-foreground/80">日期范围</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={programForm.startDate}
+                onChange={(e) => setProgramForm({ ...programForm, startDate: e.target.value })}
+                className="flex-1 h-10 rounded-xl border bg-background px-3 text-xs font-bold"
+              />
+              <span className="text-xs text-muted-foreground">至</span>
+              <input
+                type="date"
+                value={programForm.endDate}
+                onChange={(e) => setProgramForm({ ...programForm, endDate: e.target.value })}
+                className="flex-1 h-10 rounded-xl border bg-background px-3 text-xs font-bold"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Weekly: Day of Week Selection */}
+        {programForm.repeatType === "weekly" && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-muted-foreground/80">选择周期（可多选）</label>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: 0, label: "周日" },
+                { value: 1, label: "周一" },
+                { value: 2, label: "周二" },
+                { value: 3, label: "周三" },
+                { value: 4, label: "周四" },
+                { value: 5, label: "周五" },
+                { value: 6, label: "周六" }
+              ].map(day => (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => {
+                    const days = programForm.weeklyDays.includes(day.value)
+                      ? programForm.weeklyDays.filter(d => d !== day.value)
+                      : [...programForm.weeklyDays, day.value];
+                    setProgramForm({ ...programForm, weeklyDays: days });
+                  }}
+                  className={cn(
+                    "h-9 px-3 rounded-lg border text-xs font-bold transition-colors",
+                    programForm.weeklyDays.includes(day.value)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  {day.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-4 border-t">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            className="flex-1 h-10 rounded-xl font-bold"
+          >
+            取消
+          </Button>
+          <Button
+            size="sm"
+            onClick={onConfirm}
+            className="flex-1 h-10 rounded-xl font-black bg-primary hover:bg-primary/90"
+          >
+            确定添加
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export function ScheduleEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -65,6 +286,14 @@ export function ScheduleEditor() {
     const saved = localStorage.getItem("schedules");
     return saved ? JSON.parse(saved) : INITIAL_SCHEDULES;
   });
+
+  // Reload schedules from localStorage when id changes
+  React.useEffect(() => {
+    const saved = localStorage.getItem("schedules");
+    if (saved) {
+      setSchedules(JSON.parse(saved));
+    }
+  }, [id]);
 
   const schedule = React.useMemo(() => schedules.find(s => s.id === id), [schedules, id]);
 
@@ -94,14 +323,73 @@ export function ScheduleEditor() {
   const [previewTime, setPreviewTime] = React.useState<number>(0);
 
   // Date management state & customized dropdown variables
-  const [selectedDate, setSelectedDate] = React.useState<string>("2026-06-10");
+  const getToday = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  };
+  const getDateInRange = (schedule: any) => {
+    const today = getToday();
+    const startTime = schedule?.startTime ? new Date(schedule.startTime) : null;
+    const endTime = schedule?.endTime ? new Date(schedule.endTime) : null;
+    const todayDate = new Date(today);
+    if (startTime && endTime) {
+      if (todayDate < startTime || todayDate > endTime) {
+        // Today is outside range, use start date
+        const y = startTime.getFullYear();
+        const m = String(startTime.getMonth() + 1).padStart(2, '0');
+        const d = String(startTime.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+    return today;
+  };
+  const [selectedDate, setSelectedDate] = React.useState<string>(getToday());
   const [showDatePicker, setShowDatePicker] = React.useState<boolean>(false);
-  const [calendarMonth, setCalendarMonth] = React.useState<Date>(() => new Date(2026, 5, 10)); // June 2026
+  const [calendarMonth, setCalendarMonth] = React.useState<Date>(() => new Date());
   const [screenSchedulesByDate, setScreenSchedulesByDate] = React.useState<Record<string, {
     screens: string[];
-    screenSchedules: Record<string, Record<number, string>>;
+    screenSchedules: Record<string, Array<{
+      startTime: string;
+      endTime: string;
+      repeatMode: "week" | "day";
+      repeatData?: number[];
+      startDate?: string;
+      endDate?: string;
+      mediaId: string;
+      mediaName: string;
+      mediaUrl?: string;
+    }>>;
   }>>({});
-  const [scheduleDrawerOpen, setScheduleDrawerOpen] = React.useState<boolean>(false);
+
+  const [scheduleDrawerOpen, setScheduleDrawerOpen] = React.useState<{ screenNumber: string } | undefined>();
+  const [programModalOpen, setProgramModalOpen] = React.useState<boolean>(false);
+  const [programForm, setProgramForm] = React.useState({
+    content: "",
+    contentName: "",
+    startHour: 0,
+    endHour: 24,
+    repeatType: "daily" as "daily" | "weekly",
+    startDate: "",
+    endDate: "",
+    weeklyDays: [] as number[]
+  });
+
+  // Reset program form dates when drawer opens
+  React.useEffect(() => {
+    if (scheduleDrawerOpen && schedule) {
+      setProgramForm(prev => ({
+        ...prev,
+        startDate: schedule.startTime?.split('T')[0] || "",
+        endDate: schedule.endTime?.split('T')[0] || "",
+        content: "",
+        contentName: "",
+        startHour: 0,
+        endHour: 24,
+        repeatType: "daily",
+        weeklyDays: []
+      }));
+    }
+  }, [scheduleDrawerOpen, schedule]);
 
   // Mapped effects record for the timeline component
   const timelineEffects: Record<string, TimelineEffect> = React.useMemo(() => ({
@@ -115,24 +403,24 @@ export function ScheduleEditor() {
 
   // Helper converter: convert local raw state (screens & schedules map) to TimelineRow array
   const convertToTimelineData = React.useCallback((
-    screensList: string[], 
+    screensList: string[],
     schedulesMap: Record<string, Record<number, string>>
   ): TimelineRow[] => {
     return screensList.map((screen) => {
       const sched = schedulesMap[screen] || {};
       const actions: TimelineAction[] = [];
-      
+
       let currentContent = sched[0] || "OFF";
       let start = 0;
       let actionCounter = 0;
-      
+
       for (let hour = 1; hour <= 24; hour++) {
         const content = hour < 24 ? (sched[hour] || "OFF") : null;
-        
+
         if (content !== currentContent || hour === 24) {
           const fileContent = AVAILABLE_CONTENTS.find(c => c.name === currentContent);
           const effectId = fileContent ? fileContent.id : "OFF";
-          
+
           if (effectId !== "OFF") {
             actions.push({
               id: `${screen}_action_${actionCounter++}`,
@@ -142,12 +430,12 @@ export function ScheduleEditor() {
               name: currentContent
             });
           }
-          
+
           currentContent = content || "OFF";
           start = hour;
         }
       }
-      
+
       return {
         id: screen,
         actions
@@ -164,33 +452,33 @@ export function ScheduleEditor() {
   } => {
     const screensList: string[] = [];
     const schedulesMap: Record<string, Record<number, string>> = {};
-    
+
     data.forEach((row) => {
       const screen = row.id;
       screensList.push(screen);
-      
+
       const sched: Record<number, string> = {};
       // Preset full 24h as OFF
       for (let h = 0; h < 24; h++) {
         sched[h] = "OFF";
       }
-      
+
       // Map actions onto the 24 hour grid
       row.actions.forEach((action) => {
         const fileContent = AVAILABLE_CONTENTS.find(c => c.id === action.effectId);
         const mediaName = fileContent ? fileContent.name : "OFF";
-        
+
         const startHour = Math.max(0, Math.min(23, Math.floor(action.start)));
         const endHour = Math.max(1, Math.min(24, Math.ceil(action.end)));
-        
+
         for (let h = startHour; h < endHour; h++) {
           sched[h] = mediaName;
         }
       });
-      
+
       schedulesMap[screen] = sched;
     });
-    
+
     return {
       screensList,
       schedulesMap
@@ -203,15 +491,40 @@ export function ScheduleEditor() {
     const { screensList, schedulesMap } = convertFromTimelineData(newData);
     setScreens(screensList);
     setScreenSchedules(schedulesMap);
+
+    // Auto-save to localStorage when timeline changes
+    if (schedule) {
+      const finalByDate = {
+        ...screenSchedulesByDate,
+        [selectedDate]: {
+          screens: screensList,
+          screenSchedules: schedulesMap
+        }
+      };
+
+      const updatedSchedules = schedules.map(s => {
+        if (s.id === id) {
+          return {
+            ...s,
+            screens: screensList,
+            screenSchedules: schedulesMap,
+            selectedDate,
+            screenSchedulesByDate: finalByDate
+          };
+        }
+        return s;
+      });
+      localStorage.setItem("schedules", JSON.stringify(updatedSchedules));
+    }
   };
 
   // Initialize from schedule data
   React.useEffect(() => {
     if (schedule) {
-      const dbSchedulesByDate = schedule.screenSchedulesByDate || {};
+      const dbSchedulesByDate = (schedule.screenSchedulesByDate || {}) as any;
       setScreenSchedulesByDate(dbSchedulesByDate);
 
-      const savedDate = schedule.selectedDate || "2026-06-10";
+      const savedDate = schedule.selectedDate || getDateInRange(schedule);
       setSelectedDate(savedDate);
 
       const [y, m, d] = savedDate.split("-").map(Number);
@@ -226,7 +539,7 @@ export function ScheduleEditor() {
 
       let activeScreens = [...activeData.screens];
       let activeSchedules = { ...activeData.screenSchedules };
-      
+
       // Beautiful default seeds if empty
       if (Object.keys(activeSchedules).length === 0) {
         activeSchedules = {
@@ -266,24 +579,24 @@ export function ScheduleEditor() {
         screenSchedules
       }
     };
-    
-    setScreenSchedulesByDate(updatedByDate);
+
+    setScreenSchedulesByDate(updatedByDate as any);
     setSelectedDate(newDate);
 
     // 2. Fetch the target data for the new date
     const targetData = updatedByDate[newDate] || {
       screens: schedule.screens || ["1#", "2#", "3#", "4#", "5#", "6#", "7#"],
       screenSchedules: schedule.screenSchedules && Object.keys(schedule.screenSchedules).length > 0
-                       ? schedule.screenSchedules
-                       : {
-                           "1#": { 8: "元气森林夏季推广.mp4", 9: "元气森林夏季推广.mp4", 10: "元气森林夏季推广.mp4", 11: "元气森林夏季推广.mp4", 12: "默认循环播放源", 13: "默认循环播放源", 14: "默认循环播放源", 15: "默认循环播放源", 16: "默认循环播放源", 17: "默认循环播放源", 18: "必胜客新品海报.png", 19: "必胜客新品海报.png", 20: "必胜客新品海报.png", 21: "必胜客新品海报.png" },
-                           "2#": { 9: "必胜客新品海报.png", 10: "必胜客新品海报.png", 11: "必胜客新品海报.png", 12: "必胜客新品海报.png", 13: "必胜客新品海报.png", 14: "必胜客新品海报.png", 15: "客流热力导引H5组件", 16: "客流热力导引H5组件", 17: "客流热力导引H5组件", 18: "客流热力导引H5组件", 19: "客流热力导引H5组件", 20: "客流热力导引H5组件" },
-                           "3#": { 10: "商场紧急广播须知.txt", 11: "商场紧急广播须知.txt", 12: "商场紧急广播须知.txt", 13: "商场紧急广播须知.txt", 14: "元气森林夏季推广.mp4", 15: "元气森林夏季推广.mp4", 16: "元气森林夏季推广.mp4", 17: "元气森林夏季推广.mp4", 18: "元气森林夏季推广.mp4", 19: "元气森林夏季推广.mp4" },
-                           "4#": { 0: "默认循环播放源", 1: "默认循环播放源", 2: "默认循环播放源", 3: "默认循环播放源", 4: "默认循环播放源", 5: "默认循环播放源", 6: "默认循环播放源", 7: "默认循环播放源", 8: "默认循环播放源", 9: "默认循环播放源", 10: "默认循环播放源", 11: "默认循环播放源", 12: "默认循环播放源", 13: "默认循环播放源", 14: "默认循环播放源", 15: "默认循环播放源", 16: "默认循环播放源", 17: "默认循环播放源", 18: "默认循环播放源", 19: "默认循环播放源", 20: "默认循环播放源", 21: "默认循环播放源", 22: "默认循环播放源", 23: "默认循环播放源" },
-                           "5#": { 8: "客流热力导引H5组件", 9: "客流热力导引H5组件", 10: "客流热力导引H5组件", 11: "客流热力导引H5组件", 13: "元气森林夏季推广.mp4", 14: "元气森林夏季推广.mp4", 15: "元气森林夏季推广.mp4", 16: "元气森林夏季推广.mp4", 17: "元气森林夏季推广.mp4", 18: "元气森林夏季推广.mp4" },
-                           "6#": { 7: "必胜客新品海报.png", 8: "必胜客新品海报.png", 9: "必胜客新品海报.png", 10: "必胜客新品海报.png", 11: "默认循环播放源", 12: "默认循环播放源", 13: "默认循环播放源", 14: "默认循环播放源", 15: "默认循环播放源", 16: "默认循环播放源", 17: "默认循环播放源", 18: "默认循环播放源" },
-                           "7#": { 10: "元气森林夏季推广.mp4", 11: "元气森林夏季推广.mp4", 12: "元气森林夏季推广.mp4", 13: "元气森林夏季推广.mp4", 14: "元气森林夏季推广.mp4", 15: "元气森林夏季推广.mp4", 18: "商场紧急广播须知.txt", 19: "商场紧急广播须知.txt", 20: "商场紧急广播须知.txt", 21: "商场紧急广播须知.txt" }
-                         }
+        ? schedule.screenSchedules
+        : {
+          "1#": { 8: "元气森林夏季推广.mp4", 9: "元气森林夏季推广.mp4", 10: "元气森林夏季推广.mp4", 11: "元气森林夏季推广.mp4", 12: "默认循环播放源", 13: "默认循环播放源", 14: "默认循环播放源", 15: "默认循环播放源", 16: "默认循环播放源", 17: "默认循环播放源", 18: "必胜客新品海报.png", 19: "必胜客新品海报.png", 20: "必胜客新品海报.png", 21: "必胜客新品海报.png" },
+          "2#": { 9: "必胜客新品海报.png", 10: "必胜客新品海报.png", 11: "必胜客新品海报.png", 12: "必胜客新品海报.png", 13: "必胜客新品海报.png", 14: "必胜客新品海报.png", 15: "客流热力导引H5组件", 16: "客流热力导引H5组件", 17: "客流热力导引H5组件", 18: "客流热力导引H5组件", 19: "客流热力导引H5组件", 20: "客流热力导引H5组件" },
+          "3#": { 10: "商场紧急广播须知.txt", 11: "商场紧急广播须知.txt", 12: "商场紧急广播须知.txt", 13: "商场紧急广播须知.txt", 14: "元气森林夏季推广.mp4", 15: "元气森林夏季推广.mp4", 16: "元气森林夏季推广.mp4", 17: "元气森林夏季推广.mp4", 18: "元气森林夏季推广.mp4", 19: "元气森林夏季推广.mp4" },
+          "4#": { 0: "默认循环播放源", 1: "默认循环播放源", 2: "默认循环播放源", 3: "默认循环播放源", 4: "默认循环播放源", 5: "默认循环播放源", 6: "默认循环播放源", 7: "默认循环播放源", 8: "默认循环播放源", 9: "默认循环播放源", 10: "默认循环播放源", 11: "默认循环播放源", 12: "默认循环播放源", 13: "默认循环播放源", 14: "默认循环播放源", 15: "默认循环播放源", 16: "默认循环播放源", 17: "默认循环播放源", 18: "默认循环播放源", 19: "默认循环播放源", 20: "默认循环播放源", 21: "默认循环播放源", 22: "默认循环播放源", 23: "默认循环播放源" },
+          "5#": { 8: "客流热力导引H5组件", 9: "客流热力导引H5组件", 10: "客流热力导引H5组件", 11: "客流热力导引H5组件", 13: "元气森林夏季推广.mp4", 14: "元气森林夏季推广.mp4", 15: "元气森林夏季推广.mp4", 16: "元气森林夏季推广.mp4", 17: "元气森林夏季推广.mp4", 18: "元气森林夏季推广.mp4" },
+          "6#": { 7: "必胜客新品海报.png", 8: "必胜客新品海报.png", 9: "必胜客新品海报.png", 10: "必胜客新品海报.png", 11: "默认循环播放源", 12: "默认循环播放源", 13: "默认循环播放源", 14: "默认循环播放源", 15: "默认循环播放源", 16: "默认循环播放源", 17: "默认循环播放源", 18: "默认循环播放源" },
+          "7#": { 10: "元气森林夏季推广.mp4", 11: "元气森林夏季推广.mp4", 12: "元气森林夏季推广.mp4", 13: "元气森林夏季推广.mp4", 14: "元气森林夏季推广.mp4", 15: "元气森林夏季推广.mp4", 18: "商场紧急广播须知.txt", 19: "商场紧急广播须知.txt", 20: "商场紧急广播须知.txt", 21: "商场紧急广播须知.txt" }
+        }
     };
 
     setScreens(targetData.screens);
@@ -298,13 +611,17 @@ export function ScheduleEditor() {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth(); // 0-indexed
 
+    // Parse date range from schedule
+    const minDate = schedule?.startTime ? new Date(schedule.startTime) : null;
+    const maxDate = schedule?.endTime ? new Date(schedule.endTime) : null;
+
     const weekDays = [
-      t("Su") || "日", 
-      t("Mo") || "一", 
-      t("Tu") || "二", 
-      t("We") || "三", 
-      t("Th") || "四", 
-      t("Fr") || "五", 
+      t("Su") || "日",
+      t("Mo") || "一",
+      t("Tu") || "二",
+      t("We") || "三",
+      t("Th") || "四",
+      t("Fr") || "五",
       t("Sa") || "六"
     ];
 
@@ -327,6 +644,12 @@ export function ScheduleEditor() {
       setShowDatePicker(false);
     };
 
+    const isDateInRange = (day: number) => {
+      if (!minDate || !maxDate) return true;
+      const date = new Date(year, month, day);
+      return date >= minDate && date <= maxDate;
+    };
+
     const daysGrid = [];
     for (let i = 0; i < firstDayIndex; i++) {
       daysGrid.push(<div key={`empty-${i}`} className="h-5.5 w-5.5" />);
@@ -334,16 +657,20 @@ export function ScheduleEditor() {
     for (let day = 1; day <= daysInMonth; day++) {
       const formattedValue = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const isSelected = formattedValue === selectedDate;
+      const inRange = isDateInRange(day);
       daysGrid.push(
         <button
           key={`day-${day}`}
           type="button"
-          onClick={() => handleSelectDay(day)}
+          onClick={() => inRange && handleSelectDay(day)}
+          disabled={!inRange}
           className={cn(
-            "h-5.5 w-5.5 rounded text-[10px] font-black transition-all flex items-center justify-center border-none cursor-pointer",
-            isSelected 
-              ? "bg-primary text-primary-foreground scale-105 font-black shadow-sm" 
-              : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+            "h-5.5 w-5.5 rounded text-[10px] font-black transition-all flex items-center justify-center border-none",
+            isSelected
+              ? "bg-primary text-primary-foreground scale-105 font-black shadow-sm"
+              : inRange
+                ? "text-zinc-300 hover:bg-zinc-800 hover:text-white cursor-pointer"
+                : "text-zinc-700 cursor-not-allowed"
           )}
         >
           {day}
@@ -352,8 +679,8 @@ export function ScheduleEditor() {
     }
 
     const monthNames = [
-      t("Jan") || "一月", t("Feb") || "二月", t("Mar") || "三月", t("Apr") || "四月", 
-      t("May") || "五月", t("Jun") || "六月", t("Jul") || "七月", t("Aug") || "八月", 
+      t("Jan") || "一月", t("Feb") || "二月", t("Mar") || "三月", t("Apr") || "四月",
+      t("May") || "五月", t("Jun") || "六月", t("Jul") || "七月", t("Aug") || "八月",
       t("Sep") || "九月", t("Oct") || "十月", t("Nov") || "十一月", t("Dec") || "十二月"
     ];
 
@@ -361,17 +688,17 @@ export function ScheduleEditor() {
       <div className="space-y-2 select-none" onClick={(e) => e.stopPropagation()}>
         {/* Calendar Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5 mb-1 text-[10px]">
-          <button 
-            type="button" 
-            onClick={handlePrevMonth} 
+          <button
+            type="button"
+            onClick={handlePrevMonth}
             className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white border-none transition-colors"
           >
             &lt;
           </button>
           <span className="font-extrabold text-zinc-200">{year}年 {monthNames[month]}</span>
-          <button 
-            type="button" 
-            onClick={handleNextMonth} 
+          <button
+            type="button"
+            onClick={handleNextMonth}
             className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white border-none transition-colors"
           >
             &gt;
@@ -415,7 +742,7 @@ export function ScheduleEditor() {
     const numericIds = timelineData
       .map(row => parseInt(row.id.replace("#", ""), 10))
       .filter(n => !isNaN(n));
-      
+
     const nextNum = numericIds.length > 0 ? Math.max(...numericIds) + 1 : screens.length + 1;
     const defaultSuggestion = `${nextNum}#`;
 
@@ -433,8 +760,8 @@ export function ScheduleEditor() {
 
     // Duplicate check in both timeline rows and global screen list
     const isDuplicate = timelineData.some(row => row.id.trim().toLowerCase() === trimmed.toLowerCase()) ||
-                        screens.some(s => s.trim().toLowerCase() === trimmed.toLowerCase());
-                        
+      screens.some(s => s.trim().toLowerCase() === trimmed.toLowerCase());
+
     if (isDuplicate) {
       setAddScreenError(`屏幕号/名称 "${trimmed}" 已存在，请勿重复添加！`);
       return;
@@ -520,13 +847,13 @@ export function ScheduleEditor() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f8fafc] dark:bg-zinc-950 transition-colors relative">
-      
+
       {/* Upper Navigation Bar */}
       <div className="border-b bg-card px-4 py-4 md:px-6 flex items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => navigate("/schedules")}
             className="rounded-xl hover:bg-muted"
           >
@@ -545,17 +872,17 @@ export function ScheduleEditor() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => navigate("/schedules")} 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/schedules")}
             className="rounded-xl font-bold h-10 px-4 text-xs gap-1.5"
           >
             <Undo className="h-4 w-4" />
             <span>{t("Cancel") || "取消"}</span>
           </Button>
-          <Button 
-            onClick={handleSave} 
+          <Button
+            onClick={handleSave}
             className="rounded-xl font-black h-10 px-5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 shadow-md shadow-emerald-600/10 active:scale-95 transition-all"
           >
             <Save className="h-4 w-4" />
@@ -566,108 +893,108 @@ export function ScheduleEditor() {
 
       <ScrollArea className="flex-1 relative">
         <div className="w-full h-full p-4 md:p-6 pb-20 space-y-6 relative">
-          
+
           {/* UNIFIED MONITOR & TIMELINE SYSTEM CONSOLE */}
           <div className="border h-full rounded-lg border-[#1e2025] bg-[#0c0d0f] overflow-hidden relative shadow-2xl flex flex-1 flex-col">
-            
+
             {/* 32px height Consolidated Title Bar */}
             <div className="h-[32px] bg-[#0c0d0f] border-b border-[#1e2025] px-3 flex items-center justify-between text-xs text-zinc-350 font-medium select-none shrink-0 gap-3">
-                
-                {/* Left Panel title & calendar date selection */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 text-zinc-400 font-extrabold text-[11px] tracking-wide shrink-0">
-                    <Tv className="h-3.5 w-3.5 text-primary" />
-                    <span>联动播控排期</span>
-                  </div>
 
+              {/* Left Panel title & calendar date selection */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-zinc-400 font-extrabold text-[11px] tracking-wide shrink-0">
+                  <Tv className="h-3.5 w-3.5 text-primary" />
+                  <span>联动播控排期</span>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setScheduleDrawerOpen({ screenNumber: '' })}
+                  className="h-6 w-6 rounded text-zinc-400 hover:text-primary hover:bg-zinc-800/50 border-none"
+                  title="插入日程"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+
+                <div className="h-4 w-[1px] bg-zinc-800 shrink-0" />
+
+                {/* Clickable Date Display */}
+                <div className="relative shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDatePicker(prev => !prev);
+                    }}
+                    className="h-6 px-2 text-[10px] font-black text-zinc-200 hover:text-white bg-zinc-900 border border-zinc-805/80 hover:bg-zinc-800 rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Calendar className="h-3 w-3 text-primary shrink-0" />
+                    <span>{selectedDate}</span>
+                  </Button>
+
+                  {/* Floating Dropdown Calendar */}
+                  {showDatePicker && (
+                    <div className="absolute left-0 top-7 z-50 bg-[#16171b] border border-zinc-805/90 rounded-lg shadow-2xl p-3 w-56 animate-in fade-in slide-in-from-top-1 duration-150">
+                      {renderCalendar()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Panel timeline configurations: cursor time, zoom, and add screen */}
+              <div className="flex items-center gap-3 shrink-0">
+                {/* Cursor Time display */}
+                <div className="flex items-center gap-1.5 text-zinc-300 bg-zinc-900/90 px-2 py-0.5 rounded border border-zinc-800/80 font-mono text-[9.5px]">
+                  <Clock className="h-3 w-3 text-primary animate-pulse shrink-0" />
+                  <span className="text-zinc-500 font-bold">光标:</span>
+                  <span className="font-extrabold text-primary">{String(previewTime).padStart(2, "0")}:00</span>
+                </div>
+
+                {/* Zoom controls */}
+                <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-800/80 px-1 py-0.5 rounded h-6">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={() => setScheduleDrawerOpen(true)}
-                    className="h-6 w-6 rounded text-zinc-400 hover:text-primary hover:bg-zinc-800/50 border-none"
-                    title="插入日程"
+                    className="h-5 w-5 rounded p-0 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border-none disabled:opacity-30 flex items-center justify-center cursor-pointer"
+                    onClick={() => setZoom(prev => Math.max(prev - 0.15, 0.6))}
+                    disabled={zoom <= 0.6}
+                    title="缩小时间轴"
                   >
-                    <Plus className="h-3 w-3" />
+                    <ZoomOut className="h-3 w-3" />
                   </Button>
-                  
-                  <div className="h-4 w-[1px] bg-zinc-800 shrink-0" />
-                  
-                  {/* Clickable Date Display */}
-                  <div className="relative shrink-0">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowDatePicker(prev => !prev);
-                      }}
-                      className="h-6 px-2 text-[10px] font-black text-zinc-200 hover:text-white bg-zinc-900 border border-zinc-805/80 hover:bg-zinc-800 rounded flex items-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <Calendar className="h-3 w-3 text-primary shrink-0" />
-                      <span>{selectedDate}</span>
-                    </Button>
-
-                    {/* Floating Dropdown Calendar */}
-                    {showDatePicker && (
-                      <div className="absolute left-0 top-7 z-50 bg-[#16171b] border border-zinc-805/90 rounded-lg shadow-2xl p-3 w-56 animate-in fade-in slide-in-from-top-1 duration-150">
-                        {renderCalendar()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Panel timeline configurations: cursor time, zoom, and add screen */}
-                <div className="flex items-center gap-3 shrink-0">
-                  {/* Cursor Time display */}
-                  <div className="flex items-center gap-1.5 text-zinc-300 bg-zinc-900/90 px-2 py-0.5 rounded border border-zinc-800/80 font-mono text-[9.5px]">
-                    <Clock className="h-3 w-3 text-primary animate-pulse shrink-0" />
-                    <span className="text-zinc-500 font-bold">光标:</span>
-                    <span className="font-extrabold text-primary">{String(previewTime).padStart(2, "0")}:00</span>
-                  </div>
-
-                  {/* Zoom controls */}
-                  <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-800/80 px-1 py-0.5 rounded h-6">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 rounded p-0 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border-none disabled:opacity-30 flex items-center justify-center cursor-pointer"
-                      onClick={() => setZoom(prev => Math.max(prev - 0.15, 0.6))}
-                      disabled={zoom <= 0.6}
-                      title="缩小时间轴"
-                    >
-                      <ZoomOut className="h-3 w-3" />
-                    </Button>
-                    <span className="font-mono text-[9px] w-9 text-center text-primary font-black select-none">
-                      {Math.round(zoom * 100)}%
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 rounded p-0 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border-none disabled:opacity-30 flex items-center justify-center cursor-pointer"
-                      onClick={() => setZoom(prev => Math.min(prev + 0.15, 2.0))}
-                      disabled={zoom >= 2.0}
-                      title="放大时间轴"
-                    >
-                      <ZoomIn className="h-3 w-3" />
-                    </Button>
-                  </div>
-
-                  {/* Add Screen button */}
-                  <Button 
+                  <span className="font-mono text-[9px] w-9 text-center text-primary font-black select-none">
+                    {Math.round(zoom * 100)}%
+                  </span>
+                  <Button
                     type="button"
-                    onClick={handleAddScreen}
-                    className="h-5.5 gap-1 text-[9.5px] font-black bg-primary text-primary-foreground hover:bg-primary/90 rounded px-2"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 rounded p-0 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border-none disabled:opacity-30 flex items-center justify-center cursor-pointer"
+                    onClick={() => setZoom(prev => Math.min(prev + 0.15, 2.0))}
+                    disabled={zoom >= 2.0}
+                    title="放大时间轴"
                   >
-                    <Plus className="h-2.5 w-2.5 shrink-0" />
-                    <span>添加屏幕</span>
+                    <ZoomIn className="h-3 w-3" />
                   </Button>
                 </div>
+
+                {/* Add Screen button */}
+                <Button
+                  type="button"
+                  onClick={handleAddScreen}
+                  className="h-5.5 gap-1 text-[9.5px] font-black bg-primary text-primary-foreground hover:bg-primary/90 rounded px-2"
+                >
+                  <Plus className="h-2.5 w-2.5 shrink-0" />
+                  <span>添加屏幕</span>
+                </Button>
+              </div>
             </div>
 
-              {/* Seamless Screen Previews Region */}
+            {/* Seamless Screen Previews Region */}
             <div className="p-4 bg-[#0c0d0f] border-b border-[#1e2025] flex-1">
               <div className="overflow-y-auto pr-1 select-none scrollbar-thin scrollbar-thumb-zinc-850 scrollbar-track-transparent">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-5">
@@ -688,13 +1015,13 @@ export function ScheduleEditor() {
                       const isOff = currentPlayingName === "OFF";
 
                       return (
-                        <div 
-                          key={`preview_${item.id}`} 
+                        <div
+                          key={`preview_${item.id}`}
                           className="flex flex-col space-y-2 animate-in fade-in duration-200"
                         >
                           {/* 16:9 Screen container */}
                           <div className="aspect-video w-full rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden relative shadow-md group">
-                            
+
                             {/* Simulation Inner Screen */}
                             {isOff ? (
                               <div className="absolute inset-0 bg-[#0a0a0c] flex flex-col items-center justify-center p-3 text-center select-none animate-in fade-in">
@@ -777,7 +1104,7 @@ export function ScheduleEditor() {
 
                             {/* Calendar button for chart modal */}
                             <button
-                              onClick={() => setScheduleDrawerOpen(true)}
+                              onClick={() => setScheduleDrawerOpen({ screenNumber: item.id })}
                               className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity z-20"
                               title="View schedule chart"
                             >
@@ -797,33 +1124,33 @@ export function ScheduleEditor() {
               </div>
             </div>
 
-              {/* Timeline flex layout with height exactly matches custom timeline editor rows */}
-              <div className="flex h-[240px] relative shrink-0">
-              
-                {/* Left sticky column holding screens */}
-                <div
-                  className="w-[180px] border-r border-[#1d1e21] bg-[#101114] overflow-y-hidden select-none flex flex-col shrink-0"
-                >
+            {/* Timeline flex layout with height exactly matches custom timeline editor rows */}
+            <div className="flex h-[240px] relative shrink-0">
+
+              {/* Left sticky column holding screens */}
+              <div
+                className="w-[180px] border-r border-[#1d1e21] bg-[#101114] overflow-y-hidden select-none flex flex-col shrink-0"
+              >
                 {/* corner category tag - height matches time area (32px) + edit area margin top (10px) = 42px exactly */}
                 <div className="h-[32px] bg-[#131417] border-b border-zinc-800/80 px-4 flex items-center gap-1.5 shrink-0">
                   <Terminal className="h-3.5 w-3.5 text-primary" />
                   <span className="text-[10px] font-black text-zinc-300 tracking-wider">终端屏幕</span>
                 </div>
-                
+
                 {/* List of row titles mapped from timeline rows */}
-                <div 
-                  ref={domRef} 
+                <div
+                  ref={domRef}
                   style={{ overflow: 'overlay' }}
                   onScroll={(e) => {
                     const target = e.target as HTMLDivElement;
                     timelineState.current?.setScrollTop(target.scrollTop);
-                  }} 
+                  }}
                   className="mt-[8px] px-[10px] timeline-list flex-1 overflow-y-hidden flex flex-col"
                 >
                   {timelineData.map((item) => (
-                    <div 
-                      key={item.id} 
-                      className="h-[32px] group timeline-list-item flex items-center justify-center border-zinc-805/10 hover:bg-[#111215]/40 transition-colors shrink-0" 
+                    <div
+                      key={item.id}
+                      className="h-[32px] group timeline-list-item flex items-center justify-center border-zinc-805/10 hover:bg-[#111215]/40 transition-colors shrink-0"
                     >
                       <div className="p-[2.5px] w-full bg-[#1b1c20] hover:bg-[#202127] border-zinc-800/60 px-2 py-0.5 flex items-center justify-between shadow-lg transition-colors rounded-sm gap-1">
                         <div className="flex items-center gap-1 min-w-0 flex-1">
@@ -833,8 +1160,8 @@ export function ScheduleEditor() {
                             size="icon"
                             className={cn(
                               "h-5 w-5 rounded-md p-0 shrink-0 transition-colors border-none hover:bg-zinc-850",
-                              hiddenScreens[item.id] 
-                                ? "text-zinc-500 hover:text-zinc-300" 
+                              hiddenScreens[item.id]
+                                ? "text-zinc-500 hover:text-zinc-300"
                                 : "text-primary hover:text-primary/80"
                             )}
                             onClick={(e) => {
@@ -857,7 +1184,7 @@ export function ScheduleEditor() {
                             hiddenScreens[item.id] ? "text-zinc-500 line-through opacity-60" : "text-zinc-100"
                           )}>
                             {item.id} 屏幕
-                          </span> 
+                          </span>
                         </div>
                         <Button
                           type="button"
@@ -878,7 +1205,7 @@ export function ScheduleEditor() {
                           className="h-5 w-5 opacity-0 group-hover:opacity-100 rounded-md hover:bg-primary/20 hover:text-primary text-zinc-400 p-0 shrink-0 transition-all border-none"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setScheduleDrawerOpen(true);
+                            setScheduleDrawerOpen({ screenNumber: item.id });
                           }}
                           title="View schedule chart"
                         >
@@ -892,7 +1219,7 @@ export function ScheduleEditor() {
 
               {/* Right side react-timeline-editor container */}
               <div className="flex-1 bg-[#0c0d0f] relative overflow-hidden flex flex-col">
-                <Timeline 
+                <Timeline
                   ref={timelineState}
                   onChange={handleTimelineChange}
                   editorData={timelineData}
@@ -953,59 +1280,66 @@ export function ScheduleEditor() {
         </div>
 
         {/* Schedule Insertion Drawer - slides from right */}
-        {scheduleDrawerOpen && (
+        {Boolean(scheduleDrawerOpen) && (
           <>
             {/* Backdrop */}
             <div
               className="absolute inset-0 bg-black/50  z-40 animate-in fade-in duration-200"
-              onClick={() => setScheduleDrawerOpen(false)}
+              onClick={() => setScheduleDrawerOpen(undefined)}
             />
             {/* Drawer panel */}
             <div className="absolute top-0 right-0 h-full w-[80%] bg-card border-l border-border shadow-2xl z-50 animate-in slide-in-from-right duration-300 flex flex-col">
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <h3 className="text-sm font-black uppercase tracking-wide flex items-center gap-2">
-                  <Plus className="h-4 w-4 text-primary" />
-                  插入日程
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  节目编排
                 </h3>
-                <button
-                  onClick={() => setScheduleDrawerOpen(false)}
-                  className="p-1.5 rounded-lg hover:bg-muted"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setProgramModalOpen(true)}
+                    className="h-8 gap-1.5 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>添加节目</span>
+                  </Button>
+                  <button
+                    onClick={() => setScheduleDrawerOpen(undefined)}
+                    className="p-1.5 rounded-lg hover:bg-muted"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <div className="flex-1 overflow-hidden p-4">
                 {(() => {
                   const DATE_COL_WIDTH = 200;
-                  const HOUR_COL_WIDTH = 56;
+                  const HOUR_COL_WIDTH = 60;
                   const HEADER_HEIGHT = 40;
                   const HOUR_ROW_HEIGHT = 64;
 
-                  // Generate dates for 1 month (from selectedDate)
-                  const generateMonthDates = () => {
+                  // Generate dates within schedule's date range
+                  const generateDateRange = () => {
                     const result: string[] = [];
-                    const baseDate = new Date(selectedDate);
-                    const year = baseDate.getFullYear();
-                    const month = baseDate.getMonth();
-                    const firstDay = new Date(year, month, 1);
-                    const lastDay = new Date(year, month + 2, 0);
-                    for (let d = firstDay.getDate(); d <= lastDay.getDate(); d++) {
-                      const date = new Date(year, month, d);
-                      const y = date.getFullYear();
-                      const m = String(date.getMonth() + 1).padStart(2, '0');
-                      const day = String(date.getDate()).padStart(2, '0');
+                    const startDate = schedule?.startTime ? new Date(schedule.startTime) : new Date();
+                    const endDate = schedule?.endTime ? new Date(schedule.endTime) : new Date();
+                    const current = new Date(startDate);
+                    current.setHours(0, 0, 0, 0);
+                    const end = new Date(endDate);
+                    end.setHours(23, 59, 59, 999);
+                    while (current <= end) {
+                      const y = current.getFullYear();
+                      const m = String(current.getMonth() + 1).padStart(2, '0');
+                      const day = String(current.getDate()).padStart(2, '0');
                       result.push(`${y}-${m}-${day}`);
+                      current.setDate(current.getDate() + 1);
                     }
                     return result;
                   };
 
-                  const dates = Object.keys(screenSchedulesByDate).sort().length > 0
-                    ? Object.keys(screenSchedulesByDate).sort()
-                    : generateMonthDates();
- 
-
-                  const TOTAL_WIDTH = dates.length * DATE_COL_WIDTH;
-                  const TOTAL_HEIGHT = 24 * HOUR_ROW_HEIGHT;
+                  const dates = generateDateRange();
+                  const TOTAL_HOURS = 25;
 
                   // Get day of week in Chinese
                   const getDayName = (dateStr: string) => {
@@ -1030,14 +1364,14 @@ export function ScheduleEditor() {
                   };
 
                   // Cell renderers
-                  const cornerCellRenderer = () => (
-                    <div className="flex items-center justify-center bg-background border-b border-r border-border" style={{ width: HOUR_COL_WIDTH, height: HEADER_HEIGHT }}>
+                  const cornerCellRenderer = ({ style, key }: { columnIndex: number; style: React.CSSProperties; key: string }) => (
+                    <div key={key} className="flex items-center justify-center bg-background border-b border-r border-border" style={style}>
                       <span className="text-[10px] font-black text-muted-foreground uppercase">时间</span>
                     </div>
                   );
 
-                  const dateCellRenderer = ({ columnIndex, style, key  }: { columnIndex: number; style: React.CSSProperties; key: string}) => {
- 
+                  const dateCellRenderer = ({ columnIndex, style, key }: { columnIndex: number; style: React.CSSProperties; key: string }) => {
+
                     const date = dates[columnIndex];
                     return (
                       <div key={key} className="flex flex-col items-center justify-center border-b border-r border-border bg-background/80" style={style}>
@@ -1047,38 +1381,37 @@ export function ScheduleEditor() {
                     );
                   };
 
-                  const hourRowRenderer = ({ index, key, style }: { index: number; key: string; style: React.CSSProperties }) => (
-                    <div key={key} className="flex items-center bg-background border-b border-r border-border" style={style}>
-                      <span className="text-[11px] font-mono font-bold text-muted-foreground ml-2">
-                        {String(index).padStart(2, '0')}:00
+                  const hourRowRenderer = ({ rowIndex, key, style }: { rowIndex: number; key: string; style: React.CSSProperties }) => rowIndex == 0 ? (
+                    <div key={key} className="relative bg-background border-b border-border" style={{ ...style, top: (style?.top as number ?? 0) - (style.height as number) / 2, zIndex: 24 - rowIndex }}>
+                      <span className="text-[11px] absolute top-[56px] font-mono font-bold text-muted-foreground ml-2">
+                        {String(rowIndex).padStart(2, '0')}:00
                       </span>
                     </div>
-                  );
+                  ) : (
+                    <div key={key} className="relative bg-background border-b border-r border-border" style={{ ...style, top: (style?.top as number ?? 0) - (style.height as number) / 2, zIndex: 24 - rowIndex }}>
+                      <span className="text-[11px] absolute top-[56px] font-mono font-bold text-muted-foreground ml-2">
+                        {String(rowIndex).padStart(2, '0')}:00
+                      </span>
+                    </div>
+                  )
 
-                  const contentCellRenderer = ({ columnIndex, rowIndex, style, key }: { columnIndex: number; rowIndex: number; style: React.CSSProperties; key: string}) => {
-                    const date = dates[columnIndex];
-                    const hour = rowIndex;
-                    const dayData = screenSchedulesByDate[date];
-                    const screenSched = dayData?.screenSchedules || {};
-                    const firstScreenId = Object.keys(screenSched)[0] || '';
-                    const content = screenSched[firstScreenId]?.[hour] || "OFF";
-                    return (
-                      <div
-                       key={key} 
-                        className={cn(
-                          "flex items-center justify-center text-center cursor-default border-b border-r border-border",
-                          getContentColor(content)
-                        )}
-                        style={style} 
-                      >
-                        {content !== "OFF" && (
-                          <span className="text-[10px] font-bold text-white truncate px-1">
-                            {content.split('.')[0]}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  };
+                  const contentCellRenderer = ({ columnIndex, rowIndex, style, key }: { columnIndex: number; rowIndex: number; style: React.CSSProperties; key: string }) => rowIndex === 0 ? (
+                    <div
+                      key={key}
+                      className={cn(
+                        "flex items-center justify-center text-center cursor-default border-b  border-border",
+                      )}
+                      style={{ ...style, top: (style?.top as number ?? 0) - (style.height as number) / 2, zIndex: 24 - rowIndex, backgroundColor: '#fff' }}
+                    />
+                  ) : (
+                    <div
+                      key={key}
+                      className={cn(
+                        "flex items-center justify-center text-center cursor-default border-b border-r border-border",
+                      )}
+                      style={{ ...style, top: (style?.top as number ?? 0) - (style.height as number) / 2, zIndex: 24 - rowIndex, backgroundColor: '#fff' }}
+                    />
+                  );
 
                   return (
                     <div className="w-full h-full border rounded-xl bg-background/50 overflow-hidden">
@@ -1087,7 +1420,7 @@ export function ScheduleEditor() {
                           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
                             {/* Corner cell - fixed top-left */}
                             <div style={{ position: 'absolute', left: 0, top: 0, zIndex: 3 }}>
-                              <Grid 
+                              <Grid
                                 width={HOUR_COL_WIDTH}
                                 height={HEADER_HEIGHT}
                                 columnWidth={HOUR_COL_WIDTH}
@@ -1097,59 +1430,117 @@ export function ScheduleEditor() {
                                 cellRenderer={cornerCellRenderer}
                               />
                             </div>
-                             
+
 
                             <AutoSizer>
-                              {({width, height}) => (
+                              {({ width, height }) => (
                                 <div>
-                                  <div style={{ position: 'absolute', left: 0, top: HEADER_HEIGHT, zIndex: 1 }}>
-                                  <Grid
-                                    overscanRowCount={14}
-                                        overscanColumnCount={7}
-                                    scrollTop={scrollTop} 
-                                    width={HOUR_COL_WIDTH}
-                                    height={height}
-                                    columnWidth={HOUR_COL_WIDTH}
-                                    rowHeight={HOUR_ROW_HEIGHT}
-                                    columnCount={1}
-                                    rowCount={24}
-                                    cellRenderer={({ key, rowIndex, style }) => hourRowRenderer({ index: rowIndex, key, style })}
-                                  />
-                                </div>
-                                    {/* Header row - scrolls horizontally */}
-                                    <div style={{ position: 'absolute', left: HOUR_COL_WIDTH, top: 0, zIndex: 2,  }}>
-                                      <Grid 
-                                       overscanRowCount={1}
-                                        overscanColumnCount={7}
-                                        scrollLeft={scrollLeft}
-                                        onScroll={onScroll} 
-                                        width={width}
-                                        height={HEADER_HEIGHT}
-                                        columnWidth={DATE_COL_WIDTH}
-                                        rowHeight={HEADER_HEIGHT}
-                                        columnCount={dates.length}
-                                        rowCount={1}
-                                        cellRenderer={dateCellRenderer}
-                                      />
-                                    </div>
-                                    {/* Left column - scrolls vertically */}
-                                  
-                                    {/* Main content - scrolls both */}
-                                    <div style={{ position: 'absolute', left: HOUR_COL_WIDTH, top: HEADER_HEIGHT }}>
-                                      <Grid
-                                        overscanRowCount={14}
-                                        overscanColumnCount={7}
-                                        onScroll={onScroll}
-                                        scrollTop={scrollTop} 
-                                        width={width}
-                                        height={height}
-                                        columnWidth={DATE_COL_WIDTH}
-                                        rowHeight={HOUR_ROW_HEIGHT}
-                                        columnCount={dates.length}
-                                        rowCount={24}
-                                        cellRenderer={contentCellRenderer}
-                                      />
-                                    </div>
+                                  {/* Header row - scrolls horizontally */}
+                                  <div style={{ position: 'absolute', left: HOUR_COL_WIDTH, top: 0, }}>
+                                    <Grid
+                                      style={{ overflow: 'hidden' }}
+                                      overscanRowCount={1}
+                                      overscanColumnCount={7}
+                                      scrollLeft={scrollLeft}
+                                      width={width - HOUR_COL_WIDTH}
+                                      height={HEADER_HEIGHT}
+                                      columnWidth={DATE_COL_WIDTH}
+                                      rowHeight={HEADER_HEIGHT}
+                                      columnCount={dates.length}
+                                      rowCount={1}
+                                      cellRenderer={dateCellRenderer}
+                                    />
+                                  </div>
+
+                                  {/* Left column - scrolls vertically */}
+                                  <div style={{ position: 'absolute', left: 0, top: HEADER_HEIGHT, }}>
+                                    <Grid
+                                      style={{ overflow: 'hidden' }}
+                                      overscanRowCount={14}
+                                      overscanColumnCount={7}
+                                      width={HOUR_COL_WIDTH}
+                                      height={height - HEADER_HEIGHT}
+                                      columnWidth={HOUR_COL_WIDTH}
+                                      rowHeight={HOUR_ROW_HEIGHT}
+                                      columnCount={1}
+                                      rowCount={TOTAL_HOURS}
+                                      scrollTop={scrollTop}
+                                      cellRenderer={hourRowRenderer}
+                                    />
+                                  </div>
+
+                                  {/* Main content - scrolls both */}
+                                  <div style={{ position: 'absolute', left: HOUR_COL_WIDTH, top: HEADER_HEIGHT }}>
+                                    <Grid
+                                      overscanRowCount={14}
+                                      overscanColumnCount={7}
+                                      onScroll={onScroll}
+                                      scrollTop={scrollTop}
+                                      scrollLeft={scrollLeft}
+                                      width={width - HOUR_COL_WIDTH}
+                                      height={height - HEADER_HEIGHT}
+                                      columnWidth={DATE_COL_WIDTH}
+                                      rowHeight={HOUR_ROW_HEIGHT}
+                                      columnCount={dates.length}
+                                      rowCount={TOTAL_HOURS}
+                                      cellRenderer={contentCellRenderer}
+                                    />
+                                  </div>
+
+                                  <div style={{ position: 'absolute', left: HOUR_COL_WIDTH, top: HEADER_HEIGHT + HOUR_ROW_HEIGHT / 2 }}>
+                                    <Grid
+                                      onScroll={onScroll}
+                                      scrollTop={scrollTop}
+                                      scrollLeft={scrollLeft}
+                                      width={width - HOUR_COL_WIDTH}
+                                      height={height - HEADER_HEIGHT}
+                                      columnWidth={DATE_COL_WIDTH}
+                                      rowHeight={HOUR_ROW_HEIGHT * TOTAL_HOURS}
+                                      columnCount={dates.length}
+                                      rowCount={1}
+                                      cellRenderer={({ columnIndex, key, style}) => {
+
+                                        const date = dates[columnIndex];
+                                        const dayData = screenSchedulesByDate[date];
+                                        const screenSchedules = dayData?.screenSchedules || {};
+
+                                        if (scheduleDrawerOpen?.screenNumber) {
+                                          const data = screenSchedules[scheduleDrawerOpen.screenNumber]
+                                          console.log(data)
+
+
+                                          return <div></div>
+                                        }
+
+                                        const list = screenSchedules["-1#"] || []
+
+
+
+                                        return <div style={style} key={key}>{list.map(item => { 
+                                          const begin = dayjs(`${date} 00:00`)
+                                          const start = dayjs(`${date} ${item.startTime}`)
+                                          const end = dayjs(`${date} ${item.endTime}`)
+
+                                          const sms = start.diff(begin)
+                                          const ems = end.diff(begin) 
+
+                                          return (
+                                            <div key={item.startTime + item.endTime}  className="flex flex-col border border-r border-border rounded" style={{ 
+                                              position: 'absolute',
+                                              top: `${sms/86400000*100}%`,
+                                              backgroundColor: '#f0f0f0',
+                                              left: 0,
+                                              height: `${ems/86400000*100}%`,
+                                              width: DATE_COL_WIDTH
+                                            }}>
+                                              <span>{item.mediaName}</span>
+                                              <span>{item.startTime}-{item.endTime}</span>
+                                            </div>
+                                          )
+                                        })}</div>
+                                      }}
+                                    />
+                                  </div>
                                 </div>
                               )}
                             </AutoSizer>
@@ -1165,23 +1556,132 @@ export function ScheduleEditor() {
         )}
       </ScrollArea>
 
+      {/* Program Add Modal */}
+      {programModalOpen && (
+        <ProgramModal
+          programForm={programForm}
+          setProgramForm={setProgramForm}
+          onClose={() => setProgramModalOpen(false)}
+          onConfirm={() => {
+            if (!programForm.content) {
+              alert("请选择节目");
+              return;
+            }
+
+            const contentName = programForm.contentName || programForm.content || "未选择";
+            const startTime = `${String(programForm.startHour).padStart(2, '0')}:00`;
+            const endTime = `${String(programForm.endHour).padStart(2, '0')}:00`;
+
+            // Build the schedule entry for each screen
+            const buildScreenSchedule = () => {
+              if (programForm.repeatType === "daily") {
+                return {
+                  startTime,
+                  endTime,
+                  repeatMode: "day" as const,
+                  startDate: programForm.startDate,
+                  endDate: programForm.endDate,
+                  mediaId: programForm.content,
+                  mediaName: contentName,
+                  mediaUrl: ""
+                };
+              } else {
+                return {
+                  startTime,
+                  endTime,
+                  repeatMode: "week" as const,
+                  repeatData: programForm.weeklyDays,
+                  mediaId: programForm.content,
+                  mediaName: contentName,
+                  mediaUrl: ""
+                };
+              }
+            };
+
+            // Generate dates based on repeat type
+            const generateDates = () => {
+              const result: string[] = [];
+              const start = programForm.startDate;
+              const end = programForm.endDate;
+
+              if (programForm.repeatType === "daily" && start && end) {
+                const current = new Date(start);
+                const endDate = new Date(end);
+                while (current <= endDate) {
+                  const y = current.getFullYear();
+                  const m = String(current.getMonth() + 1).padStart(2, '0');
+                  const d = String(current.getDate()).padStart(2, '0');
+                  result.push(`${y}-${m}-${d}`);
+                  current.setDate(current.getDate() + 1);
+                }
+              } else if (programForm.repeatType === "weekly" && start && end && programForm.weeklyDays.length > 0) {
+                const current = new Date(start);
+                const endDate = new Date(end);
+                while (current <= endDate) {
+                  if (programForm.weeklyDays.includes(current.getDay())) {
+                    const y = current.getFullYear();
+                    const m = String(current.getMonth() + 1).padStart(2, '0');
+                    const d = String(current.getDate()).padStart(2, '0');
+                    result.push(`${y}-${m}-${d}`);
+                  }
+                  current.setDate(current.getDate() + 1);
+                }
+              }
+              return result;
+            };
+
+            const dates = generateDates();
+
+            // Update screenSchedulesByDate - structure keyed by date
+            setScreenSchedulesByDate(prev => {
+              const updated = { ...prev };
+
+              // build a new schedule
+              const build = buildScreenSchedule();
+
+              // screen number
+              const sn = scheduleDrawerOpen?.screenNumber ? scheduleDrawerOpen.screenNumber : '-1#'
+
+              // Add entry for each matching date
+              dates.forEach(dateKey => {
+                const oldData: any[] = prev[dateKey]?.screenSchedules[sn] ?? []
+
+                const newData = [...oldData, build]
+
+                  ; updated[dateKey] = {
+                    screens: screens,
+                    screenSchedules: {
+                      ...prev[dateKey]?.screenSchedules,
+                      [sn]: newData
+                    }
+                  };
+              });
+
+              return updated;
+            });
+
+            setProgramModalOpen(false);
+          }}
+        />
+      )}
+
       {/* COMPREHENSIVE MODAL BLOCK EDITOR FOR CHOSEN TIMELINE ACTION SCALE */}
       {editingCell && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 animate-in fade-in duration-200">
           <div className="bg-card border w-full max-w-md rounded-[24px] shadow-2xl p-6 relative space-y-4">
-            
-            <button 
+
+            <button
               onClick={() => setEditingCell(null)}
               className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
             >
               <X className="h-4.5 w-4.5" />
             </button>
-            
+
             <h3 className="text-sm font-black uppercase text-foreground tracking-wide flex items-center gap-2 border-b pb-3">
               <Sparkles className="h-4 w-4 text-primary animate-pulse" />
               <span>智能多媒体播控排期编辑</span>
             </h3>
-            
+
             <div className="space-y-3 bg-muted/20 p-3.5 rounded-2xl border text-xs">
               <div className="flex justify-between items-center text-zinc-400">
                 <span>选定屏幕轨道:</span>
@@ -1190,7 +1690,7 @@ export function ScheduleEditor() {
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <div>
                   <label className="text-[10px] text-muted-foreground uppercase font-black block mb-1">开始时刻 (0-23)</label>
-                  <select 
+                  <select
                     value={editingCell.start}
                     onChange={(e) => {
                       const val = parseInt(e.target.value);
@@ -1209,7 +1709,7 @@ export function ScheduleEditor() {
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground uppercase font-black block mb-1">结束时刻 (1-24)</label>
-                  <select 
+                  <select
                     value={editingCell.end}
                     onChange={(e) => {
                       const val = parseInt(e.target.value);
@@ -1242,8 +1742,8 @@ export function ScheduleEditor() {
                       type="button"
                       className={cn(
                         "p-2.5 rounded-xl border text-left font-bold transition-all flex items-center justify-between",
-                        isSelected 
-                          ? "bg-primary/5 border-primary text-primary" 
+                        isSelected
+                          ? "bg-primary/5 border-primary text-primary"
                           : "bg-background hover:bg-muted/30 border-border text-muted-foreground"
                       )}
                       onClick={() => {
@@ -1274,7 +1774,7 @@ export function ScheduleEditor() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-3 border-t">
-              <Button 
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setEditingCell(null)}
@@ -1282,7 +1782,7 @@ export function ScheduleEditor() {
               >
                 取消
               </Button>
-              <Button 
+              <Button
                 size="sm"
                 onClick={() => {
                   if (editingCell) {
@@ -1326,14 +1826,14 @@ export function ScheduleEditor() {
       {screenToDelete && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center z-50 animate-in fade-in duration-200">
           <div className="bg-card border w-full max-w-sm rounded-[24px] shadow-2xl p-6 relative space-y-4">
-            
-            <button 
+
+            <button
               onClick={() => setScreenToDelete(null)}
               className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
-            
+
             <div className="flex items-center gap-3 text-red-500">
               <div className="p-3 bg-red-500/10 rounded-full">
                 <Trash2 className="h-6 w-6" />
@@ -1350,7 +1850,7 @@ export function ScheduleEditor() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <Button 
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setScreenToDelete(null)}
@@ -1358,7 +1858,7 @@ export function ScheduleEditor() {
               >
                 取消
               </Button>
-              <Button 
+              <Button
                 size="sm"
                 onClick={() => {
                   if (screenToDelete) {
@@ -1380,14 +1880,14 @@ export function ScheduleEditor() {
       {addScreenModalOpen && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center z-50 animate-in fade-in duration-200">
           <div className="bg-card border w-full max-w-sm rounded-[24px] shadow-2xl p-6 relative space-y-4">
-            
-            <button 
+
+            <button
               onClick={() => setAddScreenModalOpen(false)}
               className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
-            
+
             <div className="flex items-center gap-3 text-primary">
               <div className="p-3 bg-primary/10 rounded-full">
                 <Plus className="h-6 w-6" />
@@ -1424,7 +1924,7 @@ export function ScheduleEditor() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <Button 
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setAddScreenModalOpen(false)}
@@ -1432,7 +1932,7 @@ export function ScheduleEditor() {
               >
                 取消
               </Button>
-              <Button 
+              <Button
                 size="sm"
                 onClick={confirmAddScreen}
                 className="rounded-[14px] font-bold h-9 text-xs bg-primary hover:bg-primary/95 text-primary-foreground shadow-xs"
@@ -1440,11 +1940,9 @@ export function ScheduleEditor() {
                 确认添加
               </Button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }

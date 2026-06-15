@@ -75,7 +75,15 @@ import { INITIAL_MEDIA_ITEMS } from "@/constants";
 export function MediaManagement() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [items, setItems] = React.useState<MediaItem[]>(INITIAL_MEDIA_ITEMS);
+  const [items, setItems] = React.useState<MediaItem[]>(() => {
+    const stored = localStorage.getItem("media-items");
+    return stored ? JSON.parse(stored) : INITIAL_MEDIA_ITEMS;
+  });
+
+  // Sync to localStorage whenever items change
+  React.useEffect(() => {
+    localStorage.setItem("media-items", JSON.stringify(items));
+  }, [items]);
   const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null);
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -91,6 +99,7 @@ export function MediaManagement() {
   
   // Form States
   const [formData, setFormData] = React.useState<Partial<MediaItem>>({
+    name: "",
     mode: "image",
     orientation: "landscape",
     aspectRatio: "16:9",
@@ -124,14 +133,32 @@ export function MediaManagement() {
 
   const handleCreateContent = () => {
     const ratio = formData.aspectRatio === "custom" ? `${customWidth}:${customHeight}` : formData.aspectRatio;
+
+    // Create content item in current folder
+    const newContent: MediaItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: formData.name || "Untitled",
+      type: "content",
+      parentId: currentFolderId,
+      mode: formData.mode as MediaMode,
+      orientation: formData.orientation as ScreenOrientation,
+      aspectRatio: ratio || "16:9",
+      tags: formData.tags || [],
+      status: "processing" as MediaStatus,
+      updatedAt: new Date().toISOString(),
+    };
+    setItems([...items, newContent]);
+
     const searchParams = new URLSearchParams({
+      id: newContent.id,
+      name: formData.name || "",
       mode: formData.mode || "image",
       orientation: formData.orientation || "landscape",
       ratio: ratio || "16:9",
       parentId: currentFolderId || "",
       tags: (formData.tags || []).join(",")
     });
-    
+
     navigate(`/media-editor?${searchParams.toString()}`);
     setIsCreateDialogOpen(false);
     resetForm();
@@ -152,6 +179,7 @@ export function MediaManagement() {
 
   const resetForm = () => {
     setFormData({
+      name: "",
       mode: "image",
       orientation: "landscape",
       aspectRatio: "16:9",
@@ -773,6 +801,18 @@ export function MediaManagement() {
           </DialogHeader>
           
           <div className="grid gap-6 py-6 px-1">
+            {/* Name Input */}
+            <div className="grid gap-3">
+              <Label htmlFor="content-name" className="text-sm font-semibold">内容名称</Label>
+              <Input
+                id="content-name"
+                placeholder="请输入内容名称"
+                value={formData.name || ""}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                className="h-10"
+              />
+            </div>
+
             {/* Mode Selection */}
             <div className="grid gap-3">
               <Label className="text-sm font-semibold">{t("Mode")}</Label>
