@@ -12,10 +12,8 @@ import {
   Undo,
   BadgeAlert,
   Terminal,
-  Clock,
-  Settings,
-  Tv,
-  HelpCircle,
+  Clock, 
+  Tv, 
   Trash2,
   Eye,
   EyeOff,
@@ -361,18 +359,21 @@ export function ScheduleEditor() {
 
   // Primary scheduling states loaded from target schedule
   const [timelineData, setTimelineData] = React.useState<TimelineRow[]>([]);
-  const [screens, setScreens] = React.useState<string[]>([
-    "1#",
-    "2#",
-    "3#",
-    "4#",
-    "5#",
-    "6#",
-    "7#",
-  ]);
-  const [screenSchedules, setScreenSchedules] = React.useState<
-    Record<string, Record<number, string>>
-  >({});
+  const [screens, setScreens] = React.useState<string[]>([]);
+  const [screenSchedules, setScreenSchedules] = React.useState<Record<
+          string,
+          Array<{
+            startTime: string;
+            endTime: string;
+            repeatMode: "week" | "day";
+            repeatData?: number[];
+            startDate?: string;
+            endDate?: string;
+            mediaId: string;
+            mediaName: string;
+            mediaUrl?: string;
+          }>
+        >>({});
   const [zoom, setZoom] = React.useState<number>(1.2);
   const [containerWidth, setContainerWidth] = React.useState<number>(1000);
   const [screenToDelete, setScreenToDelete] = React.useState<string | null>(
@@ -454,6 +455,57 @@ export function ScheduleEditor() {
     endDate: "",
     weeklyDays: [] as number[],
   });
+  const [saveScreenDialogOpen, setSaveScreenDialogOpen] =
+    React.useState<boolean>(false);
+  const [selectedTargetScreens, setSelectedTargetScreens] =
+    React.useState<string[]>([]);
+
+  // Merge function: handle time overlap between new and old schedules
+  const mergeSchedules = (oldData: any[], newItem: any) => {
+    const result: any[] = [];
+    for (const item of oldData) {
+      const oldStart = item.startTime;
+      const oldEnd = item.endTime;
+      const newStart = newItem.startTime;
+      const newEnd = newItem.endTime;
+
+      // Check if there's no overlap
+      if (oldEnd <= newStart || oldStart >= newEnd) {
+        // No overlap - keep old item as is
+        result.push(item);
+      } else {
+        // There is overlap - subtract the overlapped portion from old item
+        // Case 1: new covers old completely - skip old item (duration <= 0)
+        // Case 2: old starts before new, ends during/after new - trim end
+        // Case 3: old ends after new, starts during/before new - trim start
+        // Case 4: new is inside old - split into two
+
+        const remainingStart = oldStart < newStart ? oldStart : null;
+        const remainingEnd = oldEnd > newEnd ? oldEnd : null;
+
+        if (remainingStart !== null && remainingEnd !== null) {
+          // Case 4: new is inside old - split into two
+          result.push({ ...item, endTime: newStart });
+          result.push({ ...item, startTime: newEnd });
+        } else if (remainingStart !== null) {
+          // Case 2: trim end to newStart
+          const newItemDuration = newStart - oldStart;
+          if (newItemDuration > 0) {
+            result.push({ ...item, endTime: newStart });
+          }
+        } else if (remainingEnd !== null) {
+          // Case 3: trim start to newEnd
+          const newItemDuration = oldEnd - newEnd;
+          if (newItemDuration > 0) {
+            result.push({ ...item, startTime: newEnd });
+          }
+        }
+        // Case 1: new covers old completely - skip (don't add to result)
+      }
+    }
+    result.push(newItem);
+    return result;
+  };
 
   // Reset program form dates when drawer opens
   React.useEffect(() => {
@@ -538,10 +590,36 @@ export function ScheduleEditor() {
       data: TimelineRow[]
     ): {
       screensList: string[];
-      schedulesMap: Record<string, Record<number, string>>;
+      schedulesMap: Record<
+          string,
+          Array<{
+            startTime: string;
+            endTime: string;
+            repeatMode: "week" | "day";
+            repeatData?: number[];
+            startDate?: string;
+            endDate?: string;
+            mediaId: string;
+            mediaName: string;
+            mediaUrl?: string;
+          }>
+        >;
     } => {
       const screensList: string[] = [];
-      const schedulesMap: Record<string, Record<number, string>> = {};
+      const schedulesMap: Record<
+          string,
+          Array<{
+            startTime: string;
+            endTime: string;
+            repeatMode: "week" | "day";
+            repeatData?: number[];
+            startDate?: string;
+            endDate?: string;
+            mediaId: string;
+            mediaName: string;
+            mediaUrl?: string;
+          }>
+        > = {};
 
       data.forEach((row) => {
         const screen = row.id;
@@ -627,7 +705,7 @@ export function ScheduleEditor() {
       }
 
       const activeData = dbSchedulesByDate[savedDate] || {
-        screens: schedule.screens || ["1#", "2#", "3#", "4#", "5#", "6#", "7#"],
+        screens: schedule.screens || [],
         screenSchedules: schedule.screenSchedules || {},
       };
 
@@ -636,114 +714,7 @@ export function ScheduleEditor() {
 
       // Beautiful default seeds if empty
       if (Object.keys(activeSchedules).length === 0) {
-        activeSchedules = {
-          "1#": {
-            8: "元气森林夏季推广.mp4",
-            9: "元气森林夏季推广.mp4",
-            10: "元气森林夏季推广.mp4",
-            11: "元气森林夏季推广.mp4",
-            12: "默认循环播放源",
-            13: "默认循环播放源",
-            14: "默认循环播放源",
-            15: "默认循环播放源",
-            16: "默认循环播放源",
-            17: "默认循环播放源",
-            18: "必胜客新品海报.png",
-            19: "必胜客新品海报.png",
-            20: "必胜客新品海报.png",
-            21: "必胜客新品海报.png",
-          },
-          "2#": {
-            9: "必胜客新品海报.png",
-            10: "必胜客新品海报.png",
-            11: "必胜客新品海报.png",
-            12: "必胜客新品海报.png",
-            13: "必胜客新品海报.png",
-            14: "必胜客新品海报.png",
-            15: "客流热力导引H5组件",
-            16: "客流热力导引H5组件",
-            17: "客流热力导引H5组件",
-            18: "客流热力导引H5组件",
-            19: "客流热力导引H5组件",
-            20: "客流热力导引H5组件",
-          },
-          "3#": {
-            10: "商场紧急广播须知.txt",
-            11: "商场紧急广播须知.txt",
-            12: "商场紧急广播须知.txt",
-            13: "商场紧急广播须知.txt",
-            14: "元气森林夏季推广.mp4",
-            15: "元气森林夏季推广.mp4",
-            16: "元气森林夏季推广.mp4",
-            17: "元气森林夏季推广.mp4",
-            18: "元气森林夏季推广.mp4",
-            19: "元气森林夏季推广.mp4",
-          },
-          "4#": {
-            0: "默认循环播放源",
-            1: "默认循环播放源",
-            2: "默认循环播放源",
-            3: "默认循环播放源",
-            4: "默认循环播放源",
-            5: "默认循环播放源",
-            6: "默认循环播放源",
-            7: "默认循环播放源",
-            8: "默认循环播放源",
-            9: "默认循环播放源",
-            10: "默认循环播放源",
-            11: "默认循环播放源",
-            12: "默认循环播放源",
-            13: "默认循环播放源",
-            14: "默认循环播放源",
-            15: "默认循环播放源",
-            16: "默认循环播放源",
-            17: "默认循环播放源",
-            18: "默认循环播放源",
-            19: "默认循环播放源",
-            20: "默认循环播放源",
-            21: "默认循环播放源",
-            22: "默认循环播放源",
-            23: "默认循环播放源",
-          },
-          "5#": {
-            8: "客流热力导引H5组件",
-            9: "客流热力导引H5组件",
-            10: "客流热力导引H5组件",
-            11: "客流热力导引H5组件",
-            13: "元气森林夏季推广.mp4",
-            14: "元气森林夏季推广.mp4",
-            15: "元气森林夏季推广.mp4",
-            16: "元气森林夏季推广.mp4",
-            17: "元气森林夏季推广.mp4",
-            18: "元气森林夏季推广.mp4",
-          },
-          "6#": {
-            7: "必胜客新品海报.png",
-            8: "必胜客新品海报.png",
-            9: "必胜客新品海报.png",
-            10: "必胜客新品海报.png",
-            11: "默认循环播放源",
-            12: "默认循环播放源",
-            13: "默认循环播放源",
-            14: "默认循环播放源",
-            15: "默认循环播放源",
-            16: "默认循环播放源",
-            17: "默认循环播放源",
-            18: "默认循环播放源",
-          },
-          "7#": {
-            10: "元气森林夏季推广.mp4",
-            11: "元气森林夏季推广.mp4",
-            12: "元气森林夏季推广.mp4",
-            13: "元气森林夏季推广.mp4",
-            14: "元气森林夏季推广.mp4",
-            15: "元气森林夏季推广.mp4",
-            18: "商场紧急广播须知.txt",
-            19: "商场紧急广播须知.txt",
-            20: "商场紧急广播须知.txt",
-            21: "商场紧急广播须知.txt",
-          },
-        };
+        activeSchedules = { };
       } else {
         activeScreens.forEach((screen) => {
           if (!activeSchedules[screen]) {
@@ -778,119 +749,8 @@ export function ScheduleEditor() {
 
     // 2. Fetch the target data for the new date
     const targetData = updatedByDate[newDate] || {
-      screens: schedule.screens || ["1#", "2#", "3#", "4#", "5#", "6#", "7#"],
-      screenSchedules:
-        schedule.screenSchedules &&
-        Object.keys(schedule.screenSchedules).length > 0
-          ? schedule.screenSchedules
-          : {
-              "1#": {
-                8: "元气森林夏季推广.mp4",
-                9: "元气森林夏季推广.mp4",
-                10: "元气森林夏季推广.mp4",
-                11: "元气森林夏季推广.mp4",
-                12: "默认循环播放源",
-                13: "默认循环播放源",
-                14: "默认循环播放源",
-                15: "默认循环播放源",
-                16: "默认循环播放源",
-                17: "默认循环播放源",
-                18: "必胜客新品海报.png",
-                19: "必胜客新品海报.png",
-                20: "必胜客新品海报.png",
-                21: "必胜客新品海报.png",
-              },
-              "2#": {
-                9: "必胜客新品海报.png",
-                10: "必胜客新品海报.png",
-                11: "必胜客新品海报.png",
-                12: "必胜客新品海报.png",
-                13: "必胜客新品海报.png",
-                14: "必胜客新品海报.png",
-                15: "客流热力导引H5组件",
-                16: "客流热力导引H5组件",
-                17: "客流热力导引H5组件",
-                18: "客流热力导引H5组件",
-                19: "客流热力导引H5组件",
-                20: "客流热力导引H5组件",
-              },
-              "3#": {
-                10: "商场紧急广播须知.txt",
-                11: "商场紧急广播须知.txt",
-                12: "商场紧急广播须知.txt",
-                13: "商场紧急广播须知.txt",
-                14: "元气森林夏季推广.mp4",
-                15: "元气森林夏季推广.mp4",
-                16: "元气森林夏季推广.mp4",
-                17: "元气森林夏季推广.mp4",
-                18: "元气森林夏季推广.mp4",
-                19: "元气森林夏季推广.mp4",
-              },
-              "4#": {
-                0: "默认循环播放源",
-                1: "默认循环播放源",
-                2: "默认循环播放源",
-                3: "默认循环播放源",
-                4: "默认循环播放源",
-                5: "默认循环播放源",
-                6: "默认循环播放源",
-                7: "默认循环播放源",
-                8: "默认循环播放源",
-                9: "默认循环播放源",
-                10: "默认循环播放源",
-                11: "默认循环播放源",
-                12: "默认循环播放源",
-                13: "默认循环播放源",
-                14: "默认循环播放源",
-                15: "默认循环播放源",
-                16: "默认循环播放源",
-                17: "默认循环播放源",
-                18: "默认循环播放源",
-                19: "默认循环播放源",
-                20: "默认循环播放源",
-                21: "默认循环播放源",
-                22: "默认循环播放源",
-                23: "默认循环播放源",
-              },
-              "5#": {
-                8: "客流热力导引H5组件",
-                9: "客流热力导引H5组件",
-                10: "客流热力导引H5组件",
-                11: "客流热力导引H5组件",
-                13: "元气森林夏季推广.mp4",
-                14: "元气森林夏季推广.mp4",
-                15: "元气森林夏季推广.mp4",
-                16: "元气森林夏季推广.mp4",
-                17: "元气森林夏季推广.mp4",
-                18: "元气森林夏季推广.mp4",
-              },
-              "6#": {
-                7: "必胜客新品海报.png",
-                8: "必胜客新品海报.png",
-                9: "必胜客新品海报.png",
-                10: "必胜客新品海报.png",
-                11: "默认循环播放源",
-                12: "默认循环播放源",
-                13: "默认循环播放源",
-                14: "默认循环播放源",
-                15: "默认循环播放源",
-                16: "默认循环播放源",
-                17: "默认循环播放源",
-                18: "默认循环播放源",
-              },
-              "7#": {
-                10: "元气森林夏季推广.mp4",
-                11: "元气森林夏季推广.mp4",
-                12: "元气森林夏季推广.mp4",
-                13: "元气森林夏季推广.mp4",
-                14: "元气森林夏季推广.mp4",
-                15: "元气森林夏季推广.mp4",
-                18: "商场紧急广播须知.txt",
-                19: "商场紧急广播须知.txt",
-                20: "商场紧急广播须知.txt",
-                21: "商场紧急广播须知.txt",
-              },
-            },
+      screens: schedule.screens || [],
+      screenSchedules: schedule.screenSchedules
     };
 
     setScreens(targetData.screens);
@@ -1680,12 +1540,62 @@ export function ScheduleEditor() {
                     type="button"
                     size="sm"
                     onClick={() => {
-                      setScheduleDrawerOpen(undefined)
+                      if (scheduleDrawerOpen?.screenNumber) {
+                        // Save directly to the specified screen
+                        const sn = scheduleDrawerOpen.screenNumber;
+                        const savedData = localStorage.getItem("schedules");
+                        const schedules = savedData ? JSON.parse(savedData) : [];
+                        const currentSchedule = schedules.find(
+                          (s: any) => s.id === schedule?.id
+                        );
+                        if (currentSchedule) {
+                          // Update screenSchedulesByDate for the target screen number
+                          const updatedByDate = { ...screenSchedulesByDate };
+                          Object.keys(updatedByDate).forEach((dateKey) => {
+                            const dateData = updatedByDate[dateKey];
+                            const tempData = dateData?.screenSchedules?.["-1#"] || [];
+                            const targetData = dateData?.screenSchedules?.[sn] || [];
+                            // Merge temp data to target screen using the same merge logic
+                            const mergedData = tempData.reduce(
+                              (acc: any[], item: any) => mergeSchedules(acc, item),
+                              targetData
+                            );
+                            updatedByDate[dateKey] = {
+                              ...dateData,
+                              screens: [...new Set([...dateData.screens, sn])],
+                              screenSchedules: {
+                                ...(dateData.screenSchedules ?? {}),
+                                [sn]: mergedData,
+                              },
+                            };
+                          });
+                          // Update localStorage
+                          const updatedSchedules = schedules.map((s: any) => {
+                            if (s.id === schedule?.id) {
+                              return {
+                                ...s,
+                                screenSchedulesByDate: updatedByDate,
+                              };
+                            }
+                            return s;
+                          });
+                          localStorage.setItem(
+                            "schedules",
+                            JSON.stringify(updatedSchedules)
+                          );
+                          // Update component state
+                          setScreenSchedulesByDate(updatedByDate);
+                        }
+                        setScheduleDrawerOpen(undefined);
+                      } else {
+                        // No screen number specified - show dialog to select target screen
+                        setSaveScreenDialogOpen(true);
+                      }
                     }}
                     className="h-8 gap-1.5 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90"
-                  > 
+                  >
                     <span>保存节目</span>
-                  </Button> 
+                  </Button>
 
                   <Button
                     type="button"
@@ -2269,14 +2179,14 @@ export function ScheduleEditor() {
 
               // Add entry for each matching date
               dates.forEach((dateKey) => {
-                const oldData: any[] = prev[dateKey]?.screenSchedules[sn] ?? [];
+                const oldData: any[] = prev[dateKey]?.screenSchedules?.[sn] ?? [];
 
-                const newData = [...oldData, build];
+                const newData = mergeSchedules(oldData, build);
 
                 updated[dateKey] = {
                   screens: screens,
                   screenSchedules: {
-                    ...prev[dateKey]?.screenSchedules,
+                    ...(prev[dateKey]?.screenSchedules ?? {}),
                     [sn]: newData,
                   },
                 };
@@ -2479,6 +2389,128 @@ export function ScheduleEditor() {
                 className="rounded-[14px] font-bold h-9 text-xs bg-primary text-primary-foreground hover:bg-primary/95"
               >
                 确认播控更改
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SCREEN SELECTION DIALOG FOR SAVING WITHOUT SCREEN NUMBER */}
+      {saveScreenDialogOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-card border w-full max-w-sm rounded-[24px] shadow-2xl p-6 relative space-y-4">
+            <button
+              onClick={() => {
+                setSaveScreenDialogOpen(false);
+                setSelectedTargetScreens([]);
+              }}
+              className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h3 className="text-sm font-black uppercase text-foreground tracking-wide flex items-center gap-2 border-b pb-3">
+              <Tv className="h-4 w-4 text-primary" />
+              <span>选择目标屏幕</span>
+            </h3>
+
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                请选择要将节目保存到哪个屏幕（可多选）：
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {screens.map((screen) => (
+                  <button
+                    key={screen}
+                    onClick={() => {
+                      setSelectedTargetScreens((prev) =>
+                        prev.includes(screen)
+                          ? prev.filter((s) => s !== screen)
+                          : [...prev, screen]
+                      );
+                    }}
+                    className={cn(
+                      "h-10 rounded-xl border text-xs font-bold transition-all",
+                      selectedTargetScreens.includes(screen)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                    )}
+                  >
+                    屏幕 {screen}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSaveScreenDialogOpen(false);
+                  setSelectedTargetScreens([]);
+                }}
+                className="flex-1 rounded-xl font-bold h-9 text-xs"
+              >
+                取消
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (selectedTargetScreens.length === 0) return;
+                  const savedData = localStorage.getItem("schedules");
+                  const schedules = savedData ? JSON.parse(savedData) : [];
+                  const currentSchedule = schedules.find(
+                    (s: any) => s.id === schedule?.id
+                  );
+                  if (currentSchedule) {
+                    // Update screenSchedulesByDate for each selected screen
+                    const updatedByDate = { ...screenSchedulesByDate };
+                    selectedTargetScreens.forEach((sn) => {
+                      Object.keys(updatedByDate).forEach((dateKey) => {
+                        const dateData = updatedByDate[dateKey];
+                        const tempData = dateData?.screenSchedules?.["-1#"] || [];
+                        const targetData = dateData?.screenSchedules?.[sn] || [];
+                        // Merge temp data to target screen using the same merge logic
+                        const mergedData = tempData.reduce(
+                          (acc: any[], item: any) => mergeSchedules(acc, item),
+                          targetData
+                        );
+                        updatedByDate[dateKey] = {
+                          ...dateData,
+                          screens: [...new Set([...dateData.screens, sn])],
+                          screenSchedules: {
+                            ...(dateData.screenSchedules ?? {}),
+                            [sn]: mergedData,
+                          },
+                        };
+                      });
+                    });
+                    // Update localStorage
+                    const updatedSchedules = schedules.map((s: any) => {
+                      if (s.id === schedule?.id) {
+                        return {
+                          ...s,
+                          screenSchedulesByDate: updatedByDate,
+                        };
+                      }
+                      return s;
+                    });
+                    localStorage.setItem(
+                      "schedules",
+                      JSON.stringify(updatedSchedules)
+                    );
+                    // Update component state
+                    setScreenSchedulesByDate(updatedByDate);
+                  }
+                  setSaveScreenDialogOpen(false);
+                  setSelectedTargetScreens([]);
+                  setScheduleDrawerOpen(undefined);
+                }}
+                disabled={selectedTargetScreens.length === 0}
+                className="flex-1 rounded-xl font-bold h-9 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                确认保存
               </Button>
             </div>
           </div>

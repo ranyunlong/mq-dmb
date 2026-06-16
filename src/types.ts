@@ -78,10 +78,36 @@ export interface Schedule {
   completedTargets: number;
   publishLogs?: ScheduleLog[];
   screens?: string[];
-  screenSchedules?: Record<string, Record<number, string>>;
+  screenSchedules?: Record<
+          string,
+          Array<{
+            startTime: string;
+            endTime: string;
+            repeatMode: "week" | "day";
+            repeatData?: number[];
+            startDate?: string;
+            endDate?: string;
+            mediaId: string;
+            mediaName: string;
+            mediaUrl?: string;
+          }>
+        >;
   selectedDate?: string;
   screenSchedulesByDate?: Record<string, {
     screens: string[];
-    screenSchedules: Record<string, Record<number, string>>;
+    screenSchedules: Record<
+          string,
+          Array<{
+            startTime: string;
+            endTime: string;
+            repeatMode: "week" | "day";
+            repeatData?: number[];
+            startDate?: string;
+            endDate?: string;
+            mediaId: string;
+            mediaName: string;
+            mediaUrl?: string;
+          }>
+        >;
   }>;
 }
