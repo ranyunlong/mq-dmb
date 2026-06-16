@@ -117,32 +117,6 @@ export function ScheduleCreator() {
   const [screens, setScreens] = React.useState<string[]>(["1#", "2#", "3#"]);
   const [screenSchedules, setScreenSchedules] = React.useState<Record<string, Record<number, string>>>({});
 
-  // Dynamic initialization / addition of screen schedules
-  React.useEffect(() => {
-    if (editId) return; // Skip default prepopulation when editing an existing schedule
-    setScreenSchedules(prev => {
-      const next = { ...prev };
-      screens.forEach((scr) => {
-        if (!next[scr]) {
-          next[scr] = {};
-          // Prepopulate beautiful mock items for hours 8..22
-          for (let h = 8; h <= 22; h++) {
-            if (h % 5 === 0) {
-              next[scr][h] = AVAILABLE_CONTENTS[0].name;
-            } else if (h % 5 === 2) {
-              next[scr][h] = AVAILABLE_CONTENTS[1].name;
-            } else if (h % 5 === 4) {
-              next[scr][h] = AVAILABLE_CONTENTS[3].name;
-            } else {
-              next[scr][h] = "OFF";
-            }
-          }
-        }
-      });
-      return next;
-    });
-  }, [screens, AVAILABLE_CONTENTS, editId]);
-
   // Form States consolidated
   const [formData, setFormData] = React.useState<Partial<Schedule>>({
     name: "",
