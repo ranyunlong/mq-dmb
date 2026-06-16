@@ -11,6 +11,7 @@ import { OrganizationManagement } from "@/components/OrganizationManagement";
 import { DeviceManagement } from "@/components/DeviceManagement";
 import { RoleManagement } from "@/components/RoleManagement";
 import { FileManager } from "@/components/FileManager";
+import { FontLibrary } from "@/components/FontLibrary";
 import { AssetDesign } from "@/components/AssetDesign";
 import { SkuManagement } from "@/components/SkuManagement";
 import { MediaManagement } from "@/components/MediaManagement";
@@ -114,6 +115,7 @@ export default function App() {
                     <Route path="/devices" element={<DeviceManagement />} />
                     <Route path="/roles" element={<RoleManagement />} />
                     <Route path="/files" element={<FileManager />} />
+                    <Route path="/fonts" element={<FontLibrary />} />
                     <Route path="/asset-design" element={<AssetDesign />} />
                     <Route path="/skus" element={<SkuManagement />} />
                     <Route path="/media-content" element={<MediaManagement />} />

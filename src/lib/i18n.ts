@@ -507,7 +507,17 @@ const resources = {
       "Target Store & Region Tree Hierarchy": "Target Store & Region Tree Hierarchy",
       "Filter Tree by Device / Screen Tags": "Filter Tree by Device / Screen Tags",
       "Tree Structure Matches": "Tree Structure Matches",
-      "Stores": "Stores"
+      "Stores": "Stores",
+      "Font Library": "Font Library",
+      "Upload Font": "Upload Font",
+      "Search fonts by name or foundry...": "Search fonts by name or foundry...",
+      "No fonts found": "No fonts found",
+      "Unknown foundry": "Unknown foundry",
+      "Click or drag fonts to upload": "Click or drag fonts to upload",
+      "Supported formats: TTF, OTF, WOFF, WOFF2.": "Supported formats: TTF, OTF, WOFF, WOFF2.",
+      "Font Copyright Notice": "Font Copyright Notice",
+      "Font Copyright Disclaimer": "This platform provides storage and management services for font files only and does not review the copyright ownership or licensing status of uploaded fonts. Users must ensure they have legally purchased or obtained authorization for any font they upload and use. Any copyright dispute or legal liability arising from the use of unauthorized fonts shall be borne solely by the uploading user; the platform assumes no joint or related legal liability.",
+      "I confirm I have legally purchased or am authorized to use these fonts, and accept sole liability for any copyright dispute.": "I confirm I have legally purchased or am authorized to use these fonts, and accept sole liability for any copyright dispute."
     }
   },
   zh: {
@@ -1017,7 +1027,17 @@ const resources = {
       "Target Store & Region Tree Hierarchy": "发布 门店/区域范围",
       "Filter Tree by Device / Screen Tags": "按设备/屏幕标签筛选树结构",
       "Tree Structure Matches": "树结构层级匹配",
-      "Stores": "个门店"
+      "Stores": "个门店",
+      "Font Library": "字体库",
+      "Upload Font": "上传字体",
+      "Search fonts by name or foundry...": "按字体名称或厂商搜索...",
+      "No fonts found": "未找到字体",
+      "Unknown foundry": "未知厂商",
+      "Click or drag fonts to upload": "点击或拖拽字体文件以上传",
+      "Supported formats: TTF, OTF, WOFF, WOFF2.": "支持格式：TTF、OTF、WOFF、WOFF2。",
+      "Font Copyright Notice": "字体版权声明",
+      "Font Copyright Disclaimer": "本平台仅提供字体文件的存储与管理服务，不对所上传字体的版权归属及授权状态进行审核。用户须确保已合法购买或获得所上传及使用字体的相应授权。因使用未授权字体而引发的任何版权纠纷及法律责任，均由上传用户自行承担，平台不承担任何连带及相关法律责任。",
+      "I confirm I have legally purchased or am authorized to use these fonts, and accept sole liability for any copyright dispute.": "我确认已合法购买或获得所上传字体的使用授权，并自行承担由此产生的全部版权责任。"
     }
   }
 };
