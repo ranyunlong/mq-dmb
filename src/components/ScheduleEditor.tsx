@@ -376,6 +376,12 @@ export function ScheduleEditor() {
       }>
     >
   >({});
+
+  // Refs to hold latest screens/screenSchedules for use in closures (avoids stale state)
+  const screensRef = React.useRef(screens);
+  const screenSchedulesRef = React.useRef(screenSchedules);
+  screensRef.current = screens;
+  screenSchedulesRef.current = screenSchedules;
   const [zoom, setZoom] = React.useState<number>(1.2);
   const [containerWidth, setContainerWidth] = React.useState<number>(1000);
   const [screenToDelete, setScreenToDelete] = React.useState<string | null>(
@@ -551,6 +557,39 @@ export function ScheduleEditor() {
     return obj;
   }, [selectedDate, screenSchedulesByDate]);
  
+
+  // Helper: build timelineData from screenSchedules of the selected date
+  const buildTimelineDataFromScreenSchedules = React.useCallback(
+    (currentScreenSchedules: Record<string, Array<{
+      startTime: string;
+      endTime: string;
+      repeatMode: "week" | "day";
+      repeatData?: number[];
+      startDate?: string;
+      endDate?: string;
+      mediaId: string;
+      mediaName: string;
+      mediaUrl?: string;
+    }>>) => {
+      const b = dayjs("2026-06-06 00:00");
+      return Object.keys(currentScreenSchedules)
+        .filter((it) => it !== "-1#")
+        .map((screenId) => ({
+          id: screenId,
+          actions:
+            currentScreenSchedules[screenId]?.map(
+              ({ mediaId, mediaName, startTime, endTime }: any) => ({
+                id: mediaId,
+                effectId: mediaId,
+                name: mediaName,
+                start: dayjs(`2026-06-06 ${startTime}`).diff(b) / 3600000,
+                end: dayjs(`2026-06-06 ${endTime}`).diff(b) / 3600000,
+              })
+            ) ?? [],
+        }));
+    },
+    []
+  );
 
   // Helper converter: convert local raw state (screens & schedules map) to TimelineRow array
   const convertToTimelineData = React.useCallback(
@@ -762,6 +801,39 @@ export function ScheduleEditor() {
       }
     }
   }, [schedule, convertToTimelineData]);
+
+  // Sync timelineData and screenSchedules when screenSchedulesByDate changes
+  React.useEffect(() => {
+    if (!schedule) return;
+    const currentData = screenSchedulesByDate[selectedDate];
+    if (!currentData) return;
+
+    const { screens: currentScreens, screenSchedules: currentScreenSchedules } = currentData;
+
+    // Only update if different from current state to avoid infinite loops
+    const schedulesEqual = JSON.stringify(screenSchedules) === JSON.stringify(currentScreenSchedules);
+    if (schedulesEqual) return;
+
+    setScreens(currentScreens || []);
+    setScreenSchedules(currentScreenSchedules || {});
+
+    const b = dayjs("2026-06-06 00:00");
+    const newTimelineData = Object.keys(currentScreenSchedules || {})
+      .filter((it) => it !== "-1#")
+      .map((screenId) => ({
+        id: screenId,
+        actions: (currentScreenSchedules?.[screenId] || []).map(
+          ({ mediaId, mediaName, startTime, endTime }: any) => ({
+            id: mediaId,
+            effectId: mediaId,
+            name: mediaName,
+            start: dayjs(`2026-06-06 ${startTime}`).diff(b) / 3600000,
+            end: dayjs(`2026-06-06 ${endTime}`).diff(b) / 3600000,
+          })
+        ),
+      }));
+    setTimelineData(newTimelineData);
+  }, [screenSchedulesByDate, selectedDate, schedule]);
 
   // Handle date switching
   const handleDateChange = (newDate: string) => {
@@ -2193,9 +2265,31 @@ export function ScheduleEditor() {
                     [sn]: newData,
                   },
                 };
-              }); 
+              });
 
               return updated;
+            });
+
+            // Refresh timelineData immediately for selectedDate
+            setScreenSchedulesByDate((prev) => {
+              const sn = scheduleDrawerOpen?.screenNumber
+                ? scheduleDrawerOpen.screenNumber
+                : "-1#";
+              const build = buildScreenSchedule();
+
+              dates.forEach((dateKey) => {
+                const oldData: any[] =
+                  prev[dateKey]?.screenSchedules?.[sn] ?? [];
+                const newData = mergeSchedules(oldData, build);
+                prev[dateKey] = {
+                  screens: screens,
+                  screenSchedules: {
+                    ...(prev[dateKey]?.screenSchedules ?? {}),
+                    [sn]: newData,
+                  },
+                };
+              });
+              return { ...prev };
             });
 
             setProgramModalOpen(false);
