@@ -12,8 +12,8 @@ import {
   Undo,
   BadgeAlert,
   Terminal,
-  Clock, 
-  Tv, 
+  Clock,
+  Tv,
   Trash2,
   Eye,
   EyeOff,
@@ -360,20 +360,22 @@ export function ScheduleEditor() {
   // Primary scheduling states loaded from target schedule
   const [timelineData, setTimelineData] = React.useState<TimelineRow[]>([]);
   const [screens, setScreens] = React.useState<string[]>([]);
-  const [screenSchedules, setScreenSchedules] = React.useState<Record<
-          string,
-          Array<{
-            startTime: string;
-            endTime: string;
-            repeatMode: "week" | "day";
-            repeatData?: number[];
-            startDate?: string;
-            endDate?: string;
-            mediaId: string;
-            mediaName: string;
-            mediaUrl?: string;
-          }>
-        >>({});
+  const [screenSchedules, setScreenSchedules] = React.useState<
+    Record<
+      string,
+      Array<{
+        startTime: string;
+        endTime: string;
+        repeatMode: "week" | "day";
+        repeatData?: number[];
+        startDate?: string;
+        endDate?: string;
+        mediaId: string;
+        mediaName: string;
+        mediaUrl?: string;
+      }>
+    >
+  >({});
   const [zoom, setZoom] = React.useState<number>(1.2);
   const [containerWidth, setContainerWidth] = React.useState<number>(1000);
   const [screenToDelete, setScreenToDelete] = React.useState<string | null>(
@@ -440,6 +442,10 @@ export function ScheduleEditor() {
     >
   >({});
 
+  // Use ref to always get latest screenSchedulesByDate (avoids stale closure issue)
+  const screenSchedulesByDateRef = React.useRef(screenSchedulesByDate);
+  screenSchedulesByDateRef.current = screenSchedulesByDate;
+
   const [scheduleDrawerOpen, setScheduleDrawerOpen] = React.useState<
     { screenNumber: string } | undefined
   >();
@@ -457,11 +463,15 @@ export function ScheduleEditor() {
   });
   const [saveScreenDialogOpen, setSaveScreenDialogOpen] =
     React.useState<boolean>(false);
-  const [selectedTargetScreens, setSelectedTargetScreens] =
-    React.useState<string[]>([]);
+  const [selectedTargetScreens, setSelectedTargetScreens] = React.useState<
+    string[]
+  >([]);
 
   // Merge function: handle time overlap between new and old schedules
   const mergeSchedules = (oldData: any[], newItem: any) => {
+    if (!Array.isArray(oldData)) {
+      oldData = []
+    }
     const result: any[] = [];
     for (const item of oldData) {
       const oldStart = item.startTime;
@@ -525,17 +535,22 @@ export function ScheduleEditor() {
   }, [scheduleDrawerOpen, schedule]);
 
   // Mapped effects record for the timeline component
-  const timelineEffects: Record<string, TimelineEffect> = React.useMemo(
-    () => ({
-      c1: { id: "c1", name: "元气森林夏季推广.mp4" },
-      c2: { id: "c2", name: "必胜客新品海报.png" },
-      c3: { id: "c3", name: "商场紧急广播须知.txt" },
-      c4: { id: "c4", name: "默认循环播放源" },
-      c5: { id: "c5", name: "客流热力导引H5组件" },
-      OFF: { id: "OFF", name: "熄屏关闭 / OFF" },
-    }),
-    []
-  );
+  const timelineEffects: Record<string, TimelineEffect> = React.useMemo(() => {
+    const obj: Record<string, TimelineEffect> = {};
+    const data = screenSchedulesByDate?.[selectedDate]?.screenSchedules;  
+    if (data) {
+      Object.keys(data).forEach((key) => {
+        data?.[key]?.forEach?.((it) => {
+          obj[it.mediaId] = {
+            id: it.mediaId, 
+            name: it.mediaName,
+          };
+        });
+      });
+    }
+    return obj;
+  }, [selectedDate, screenSchedulesByDate]);
+ 
 
   // Helper converter: convert local raw state (screens & schedules map) to TimelineRow array
   const convertToTimelineData = React.useCallback(
@@ -591,35 +606,35 @@ export function ScheduleEditor() {
     ): {
       screensList: string[];
       schedulesMap: Record<
-          string,
-          Array<{
-            startTime: string;
-            endTime: string;
-            repeatMode: "week" | "day";
-            repeatData?: number[];
-            startDate?: string;
-            endDate?: string;
-            mediaId: string;
-            mediaName: string;
-            mediaUrl?: string;
-          }>
-        >;
+        string,
+        Array<{
+          startTime: string;
+          endTime: string;
+          repeatMode: "week" | "day";
+          repeatData?: number[];
+          startDate?: string;
+          endDate?: string;
+          mediaId: string;
+          mediaName: string;
+          mediaUrl?: string;
+        }>
+      >;
     } => {
       const screensList: string[] = [];
       const schedulesMap: Record<
-          string,
-          Array<{
-            startTime: string;
-            endTime: string;
-            repeatMode: "week" | "day";
-            repeatData?: number[];
-            startDate?: string;
-            endDate?: string;
-            mediaId: string;
-            mediaName: string;
-            mediaUrl?: string;
-          }>
-        > = {};
+        string,
+        Array<{
+          startTime: string;
+          endTime: string;
+          repeatMode: "week" | "day";
+          repeatData?: number[];
+          startDate?: string;
+          endDate?: string;
+          mediaId: string;
+          mediaName: string;
+          mediaUrl?: string;
+        }>
+      > = {};
 
       data.forEach((row) => {
         const screen = row.id;
@@ -667,7 +682,7 @@ export function ScheduleEditor() {
     // Auto-save to localStorage when timeline changes
     if (schedule) {
       const finalByDate = {
-        ...screenSchedulesByDate,
+        ...screenSchedulesByDateRef.current,
         [selectedDate]: {
           screens: screensList,
           screenSchedules: schedulesMap,
@@ -714,7 +729,7 @@ export function ScheduleEditor() {
 
       // Beautiful default seeds if empty
       if (Object.keys(activeSchedules).length === 0) {
-        activeSchedules = { };
+        activeSchedules = {};
       } else {
         activeScreens.forEach((screen) => {
           if (!activeSchedules[screen]) {
@@ -726,8 +741,25 @@ export function ScheduleEditor() {
       setScreens(activeScreens);
       setScreenSchedules(activeSchedules);
 
-      const initialData = convertToTimelineData(activeScreens, activeSchedules);
-      setTimelineData(initialData);
+      if (activeSchedules) {
+        const b = dayjs("2026-06-06 00:00");
+        setTimelineData(
+          Object.keys(activeSchedules)
+            .filter((it) => it !== "-1#")
+            .map((it) => ({
+              id: it,
+              actions: activeSchedules?.[it]?.map?.(
+                ({ mediaId, mediaName, startTime, endTime }: any) => ({
+                  id: mediaId,
+                  effectId: mediaId,
+                  name: mediaName,
+                  start: dayjs(`2026-06-06 ${startTime}`).diff(b) / 3600000,
+                  end: dayjs(`2026-06-06 ${endTime}`).diff(b) / 3600000,
+                })
+              ) ?? [],
+            }))
+        );
+      }
     }
   }, [schedule, convertToTimelineData]);
 
@@ -750,17 +782,34 @@ export function ScheduleEditor() {
     // 2. Fetch the target data for the new date
     const targetData = updatedByDate[newDate] || {
       screens: schedule.screens || [],
-      screenSchedules: schedule.screenSchedules
+      screenSchedules: schedule.screenSchedules,
     };
 
     setScreens(targetData.screens);
     setScreenSchedules(targetData.screenSchedules);
+    const activeSchedules = targetData.screenSchedules
 
-    const initialData = convertToTimelineData(
-      targetData.screens,
-      targetData.screenSchedules
-    );
-    setTimelineData(initialData);
+
+    if (activeSchedules) {
+        const b = dayjs("2026-06-06 00:00");
+        setTimelineData(
+          Object.keys(activeSchedules)
+            .filter((it) => it !== "-1#")
+            .map((it) => ({
+              id: it,
+              actions: activeSchedules?.[it]?.map?.(
+                ({ mediaId, mediaName, startTime, endTime }: any) => ({
+                  id: mediaId,
+                  effectId: mediaId,
+                  name: mediaName,
+                  start: dayjs(`2026-06-06 ${startTime}`).diff(b) / 3600000,
+                  end: dayjs(`2026-06-06 ${endTime}`).diff(b) / 3600000,
+                })
+              ) ?? [],
+            }))
+        );
+      }
+ 
   };
 
   // Render beautiful calendar monthly grid
@@ -1135,7 +1184,10 @@ export function ScheduleEditor() {
                   <Clock className="h-3 w-3 text-primary animate-pulse shrink-0" />
                   <span className="text-zinc-500 font-bold">光标:</span>
                   <span className="font-extrabold text-primary">
-                    {String(previewTime).padStart(2, "0")}:00
+                    {String(Math.floor(previewTime)).padStart(2, "0")}:
+                    {String(
+                      Math.floor((previewTime - Math.floor(previewTime)) * 60)
+                    ).padStart(2, "0")}
                   </span>
                 </div>
 
@@ -1208,13 +1260,28 @@ export function ScheduleEditor() {
                       const isHidden = hiddenScreens[item.id];
                       if (isHidden) return null;
 
+                      const mediaItem = Array.isArray(screenSchedules[item.id])
+                        ? screenSchedules[item.id]
+                        : [];
+
+                      const current = Math.floor(previewTime * 60 * 60 * 1000);
+
+                      const display = mediaItem?.find((it) => {
+                        const b = dayjs("2026-06-01 00:00");
+                        const s = dayjs("2026-06-01 " + it.startTime).diff(
+                          b,
+                          "dates"
+                        );
+                        const e = dayjs("2026-06-01 " + it.endTime).diff(
+                          b,
+                          "dates"
+                        );
+
+                        return current >= s && current <= e;
+                      });
+
                       // Find what is playing at previewTime
-                      const currentPlayingName =
-                        screenSchedules[item.id]?.[previewTime] || "OFF";
-                      const mediaItem = AVAILABLE_CONTENTS.find(
-                        (c) => c.name === currentPlayingName
-                      );
-                      const isOff = currentPlayingName === "OFF";
+                      const currentPlayingName = display?.mediaName;
 
                       return (
                         <div
@@ -1224,86 +1291,19 @@ export function ScheduleEditor() {
                           {/* 16:9 Screen container */}
                           <div className="aspect-video w-full rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden relative shadow-md group">
                             {/* Simulation Inner Screen */}
-                            {isOff ? (
+                            {!currentPlayingName ? (
                               <div className="absolute inset-0 bg-[#0a0a0c] flex flex-col items-center justify-center p-3 text-center select-none animate-in fade-in">
                                 <div className="w-1.5 h-1.5 rounded-full bg-red-500/80 animate-ping absolute top-2 right-2" />
                                 <div className="w-1.5 h-1.5 rounded-full bg-red-600 absolute top-2 right-2" />
                                 <Tv className="h-5 w-5 text-zinc-800 mb-1.5" />
                                 <span className="text-[9px] font-mono font-bold text-zinc-650 tracking-wider">
-                                  熄屏 / OFF
+                                  NA
                                 </span>
                               </div>
                             ) : (
                               <div className="absolute inset-0 flex flex-col justify-between p-3 select-none overflow-hidden relative">
-                                {/* Visual Background Pattern based on Media Type */}
-                                {mediaItem?.type === "video" && (
-                                  <>
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-950/90 to-teal-900/60 opacity-95" />
-                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-teal-500/10 via-transparent to-transparent" />
-                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
-                                      <span className="text-[8px] font-mono text-emerald-400">
-                                        VIDEO
-                                      </span>
-                                    </div>
-                                  </>
-                                )}
-
-                                {mediaItem?.type === "image" && (
-                                  <>
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-orange-950/95 to-amber-900/60 opacity-95" />
-                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent" />
-                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
-                                      <span className="text-[8px] font-mono text-amber-500">
-                                        POSTER
-                                      </span>
-                                    </div>
-                                  </>
-                                )}
-
-                                {mediaItem?.type === "notice" && (
-                                  <>
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-red-950/95 to-rose-900/60 opacity-95 border border-red-500/10" />
-                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-60">
-                                      <span className="text-[8px] font-mono text-rose-400">
-                                        NOTICE
-                                      </span>
-                                    </div>
-                                  </>
-                                )}
-
-                                {mediaItem?.type === "interactive" && (
-                                  <>
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-[#0a051d] to-[#12052c] opacity-95" />
-                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-500/15 via-transparent to-transparent" />
-                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-65">
-                                      <span className="text-[8px] font-mono text-cyan-400">
-                                        H5 APP
-                                      </span>
-                                    </div>
-                                  </>
-                                )}
-
-                                {mediaItem?.type === "default" && (
-                                  <>
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-zinc-900 to-zinc-800 opacity-95" />
-                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
-                                    <div className="absolute bottom-1 right-2 w-full flex justify-end gap-1 opacity-50">
-                                      <span className="text-[8px] font-mono text-zinc-500">
-                                        STREAM
-                                      </span>
-                                    </div>
-                                  </>
-                                )}
-
                                 {/* Content Display inside Screen */}
                                 <div className="relative z-10 flex flex-col h-full justify-between">
-                                  <div className="flex justify-between items-center w-full">
-                                    <span className="text-[8px] font-black text-white/60 bg-black/55 px-1.5 py-0.5 rounded border border-white/5 uppercase font-mono">
-                                      {mediaItem?.type || "unknown"}
-                                    </span>
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  </div>
-
                                   <div className="my-auto py-1 text-center">
                                     <p className="text-[10px] md:text-[11px] font-black text-white tracking-tight leading-snug line-clamp-2 px-1 text-shadow-md">
                                       {currentPlayingName}
@@ -1460,12 +1460,10 @@ export function ScheduleEditor() {
                     `${String(Math.floor(v)).padStart(2, "0")}:00`
                   }
                   onCursorDrag={(time) => {
-                    const hour = Math.min(23, Math.max(0, Math.floor(time)));
-                    setPreviewTime(hour);
+                    setPreviewTime(time);
                   }}
                   onClickTimeArea={(time) => {
-                    const hour = Math.min(23, Math.max(0, Math.floor(time)));
-                    setPreviewTime(hour);
+                    setPreviewTime(time);
                     return true;
                   }}
                   onScroll={({ scrollTop }) => {
@@ -1534,7 +1532,6 @@ export function ScheduleEditor() {
                     <Plus className="h-3.5 w-3.5" />
                     <span>添加节目</span>
                   </Button>
-                  
 
                   <Button
                     type="button"
@@ -1544,7 +1541,9 @@ export function ScheduleEditor() {
                         // Save directly to the specified screen
                         const sn = scheduleDrawerOpen.screenNumber;
                         const savedData = localStorage.getItem("schedules");
-                        const schedules = savedData ? JSON.parse(savedData) : [];
+                        const schedules = savedData
+                          ? JSON.parse(savedData)
+                          : [];
                         const currentSchedule = schedules.find(
                           (s: any) => s.id === schedule?.id
                         );
@@ -1553,11 +1552,14 @@ export function ScheduleEditor() {
                           const updatedByDate = { ...screenSchedulesByDate };
                           Object.keys(updatedByDate).forEach((dateKey) => {
                             const dateData = updatedByDate[dateKey];
-                            const tempData = dateData?.screenSchedules?.["-1#"] || [];
-                            const targetData = dateData?.screenSchedules?.[sn] || [];
+                            const tempData =
+                              dateData?.screenSchedules?.["-1#"] || [];
+                            const targetData =
+                              dateData?.screenSchedules?.[sn] || [];
                             // Merge temp data to target screen using the same merge logic
                             const mergedData = tempData.reduce(
-                              (acc: any[], item: any) => mergeSchedules(acc, item),
+                              (acc: any[], item: any) =>
+                                mergeSchedules(acc, item),
                               targetData
                             );
                             updatedByDate[dateKey] = {
@@ -1601,12 +1603,12 @@ export function ScheduleEditor() {
                     type="button"
                     size="sm"
                     onClick={() => {
-                      setScheduleDrawerOpen(undefined)
+                      setScheduleDrawerOpen(undefined);
                     }}
                     className="h-8 gap-1.5 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90"
-                  > 
+                  >
                     <span>关闭</span>
-                  </Button> 
+                  </Button>
                 </div>
               </div>
               <div className="flex-1 overflow-hidden p-4">
@@ -2179,7 +2181,8 @@ export function ScheduleEditor() {
 
               // Add entry for each matching date
               dates.forEach((dateKey) => {
-                const oldData: any[] = prev[dateKey]?.screenSchedules?.[sn] ?? [];
+                const oldData: any[] =
+                  prev[dateKey]?.screenSchedules?.[sn] ?? [];
 
                 const newData = mergeSchedules(oldData, build);
 
@@ -2190,9 +2193,7 @@ export function ScheduleEditor() {
                     [sn]: newData,
                   },
                 };
-              });
-
-              console.log(updated)
+              }); 
 
               return updated;
             });
@@ -2469,8 +2470,10 @@ export function ScheduleEditor() {
                     selectedTargetScreens.forEach((sn) => {
                       Object.keys(updatedByDate).forEach((dateKey) => {
                         const dateData = updatedByDate[dateKey];
-                        const tempData = dateData?.screenSchedules?.["-1#"] || [];
-                        const targetData = dateData?.screenSchedules?.[sn] || [];
+                        const tempData =
+                          dateData?.screenSchedules?.["-1#"] || [];
+                        const targetData =
+                          dateData?.screenSchedules?.[sn] || [];
                         // Merge temp data to target screen using the same merge logic
                         const mergedData = tempData.reduce(
                           (acc: any[], item: any) => mergeSchedules(acc, item),
