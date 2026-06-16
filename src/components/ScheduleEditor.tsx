@@ -822,7 +822,7 @@ export function ScheduleEditor() {
       .filter((it) => it !== "-1#")
       .map((screenId) => ({
         id: screenId,
-        actions: (currentScreenSchedules?.[screenId] || []).map(
+        actions: (currentScreenSchedules?.[screenId] || [])?.map?.(
           ({ mediaId, mediaName, startTime, endTime }: any) => ({
             id: mediaId,
             effectId: mediaId,
@@ -830,7 +830,7 @@ export function ScheduleEditor() {
             start: dayjs(`2026-06-06 ${startTime}`).diff(b) / 3600000,
             end: dayjs(`2026-06-06 ${endTime}`).diff(b) / 3600000,
           })
-        ),
+        ) ?? [],
       }));
     setTimelineData(newTimelineData);
   }, [screenSchedulesByDate, selectedDate, schedule]);
@@ -2034,7 +2034,7 @@ export function ScheduleEditor() {
                                             ] || [];
                                           return (
                                             <div style={style} key={key}>
-                                              {list.map((item) => {
+                                              {list?.map?.((item) => {
                                                 const begin = dayjs(
                                                   `${date} 00:00`
                                                 );
