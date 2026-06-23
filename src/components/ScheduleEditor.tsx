@@ -80,6 +80,61 @@ const ProgramModal = React.memo(
       return stored ? JSON.parse(stored) : [];
     }, []);
 
+    // Quick time-slot presets (persisted in localStorage), seeded with defaults
+    const DEFAULT_TIME_PRESETS = [
+      { name: "早餐", startHour: 9, endHour: 10 },
+      { name: "午餐", startHour: 12, endHour: 14 },
+    ];
+    const [presets, setPresets] = React.useState<
+      Array<{ name: string; startHour: number; endHour: number }>
+    >(() => {
+      const stored = localStorage.getItem("time-slot-presets");
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch {
+          return DEFAULT_TIME_PRESETS;
+        }
+      }
+      return DEFAULT_TIME_PRESETS;
+    });
+    const [isNaming, setIsNaming] = React.useState(false);
+    const [newName, setNewName] = React.useState("");
+    const [presetToDelete, setPresetToDelete] = React.useState<number | null>(
+      null
+    );
+
+    const fmtHour = (h: number) => `${String(h).padStart(2, "0")}:00`;
+
+    const currentMatchesPreset = presets.some(
+      (p) =>
+        p.startHour === programForm.startHour &&
+        p.endHour === programForm.endHour
+    );
+
+    const savePreset = () => {
+      const name = newName.trim();
+      if (!name) return;
+      const next = [
+        ...presets,
+        {
+          name,
+          startHour: programForm.startHour,
+          endHour: programForm.endHour,
+        },
+      ];
+      setPresets(next);
+      localStorage.setItem("time-slot-presets", JSON.stringify(next));
+      setIsNaming(false);
+      setNewName("");
+    };
+
+    const deletePreset = (index: number) => {
+      const next = presets.filter((_, i) => i !== index);
+      setPresets(next);
+      localStorage.setItem("time-slot-presets", JSON.stringify(next));
+    };
+
     return (
       <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 animate-in fade-in duration-200">
         <div className="bg-card border w-full max-w-lg rounded-[24px] shadow-2xl p-6 relative space-y-4 max-h-[80vh] flex flex-col">
@@ -185,6 +240,106 @@ const ProgramModal = React.memo(
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* 2.5 Quick time-slot presets */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-muted-foreground/80">
+              常用时间段
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {presets.map((p, i) => {
+                const selected =
+                  p.startHour === programForm.startHour &&
+                  p.endHour === programForm.endHour;
+                return (
+                  <div
+                    key={`${p.name}-${i}`}
+                    className={cn(
+                      "group flex items-center h-8 rounded-lg border text-xs font-bold transition-colors",
+                      selected
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:bg-muted"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProgramForm({
+                          ...programForm,
+                          startHour: p.startHour,
+                          endHour: p.endHour,
+                        })
+                      }
+                      className="h-full flex items-center pl-3 pr-1.5"
+                    >
+                      {p.name} {fmtHour(p.startHour)}-{fmtHour(p.endHour)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPresetToDelete(i)}
+                      title="删除候选时间段"
+                      className="h-full flex items-center pr-2 pl-0.5 opacity-50 hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {!currentMatchesPreset &&
+              (isNaming ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") savePreset();
+                      if (e.key === "Escape") {
+                        setIsNaming(false);
+                        setNewName("");
+                      }
+                    }}
+                    placeholder={`为 ${fmtHour(programForm.startHour)}-${fmtHour(
+                      programForm.endHour
+                    )} 命名`}
+                    className="flex-1 h-9 rounded-lg border bg-background px-3 text-xs font-bold"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={savePreset}
+                    disabled={!newName.trim()}
+                    className="h-9 rounded-lg text-xs font-bold"
+                  >
+                    保存
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsNaming(false);
+                      setNewName("");
+                    }}
+                    className="h-9 rounded-lg text-xs font-bold"
+                  >
+                    取消
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsNaming(true)}
+                  className="flex items-center gap-1.5 text-[11px] font-bold text-primary hover:text-primary/80 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  将 {fmtHour(programForm.startHour)}-
+                  {fmtHour(programForm.endHour)} 保存到候选列表
+                </button>
+              ))}
           </div>
 
           {/* 3. Repeat Mode */}
@@ -313,6 +468,63 @@ const ProgramModal = React.memo(
             </Button>
           </div>
         </div>
+
+        {/* Confirm delete preset dialog */}
+        {presetToDelete !== null && presets[presetToDelete] && (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center z-[60] animate-in fade-in duration-200">
+            <div className="bg-card border w-full max-w-sm rounded-[24px] shadow-2xl p-6 relative space-y-4">
+              <button
+                onClick={() => setPresetToDelete(null)}
+                className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="flex items-center gap-3 text-red-500">
+                <div className="p-3 bg-red-500/10 rounded-full">
+                  <Trash2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-foreground text-sm">
+                    确认删除候选时间段？
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    删除后将从常用时间段列表中移除。
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-muted/20 border rounded-2xl text-center">
+                <kbd className="text-xs font-mono font-bold text-red-500 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-md">
+                  {presets[presetToDelete].name}{" "}
+                  {fmtHour(presets[presetToDelete].startHour)}-
+                  {fmtHour(presets[presetToDelete].endHour)}
+                </kbd>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPresetToDelete(null)}
+                  className="rounded-xl font-bold h-9 text-xs"
+                >
+                  取消
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    deletePreset(presetToDelete);
+                    setPresetToDelete(null);
+                  }}
+                  className="rounded-[14px] font-bold h-9 text-xs bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/10"
+                >
+                  确认删除
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
