@@ -1,20 +1,20 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { 
-  Monitor, 
-  Layout, 
-  Play, 
-  Image as ImageIcon, 
-  Globe, 
-  ChevronRight, 
-  Folder, 
-  Grid, 
-  List as ListIcon, 
-  Plus, 
-  Search, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
+import {
+  Monitor,
+  Layout,
+  Play,
+  Image as ImageIcon,
+  Globe,
+  ChevronRight,
+  Folder,
+  Grid,
+  List as ListIcon,
+  Plus,
+  Search,
+  MoreVertical,
+  Edit,
+  Trash2,
   FolderPlus,
   ArrowLeft,
   ChevronDown,
@@ -27,7 +27,8 @@ import {
   AlertCircle,
   RefreshCw,
   Eye,
-  Zap
+  Zap,
+  Grid2X2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
@@ -69,7 +70,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
-import { MediaItem, MediaMode, ScreenOrientation, AspectRatio, MediaStatus } from "@/types";
+import { MediaItem, MediaMode, ScreenOrientation, AspectRatio, MediaStatus, CrossScreenConfig } from "@/types";
 import { INITIAL_MEDIA_ITEMS } from "@/constants";
 
 export function MediaManagement() {
@@ -109,6 +110,71 @@ export function MediaManagement() {
   const [folderName, setFolderName] = React.useState("");
   const [tagInput, setTagInput] = React.useState("");
 
+  // 跨屏联动配置状态
+  const [crossScreenRows, setCrossScreenRows] = React.useState(1);
+  const [crossScreenCols, setCrossScreenCols] = React.useState(1);
+  const [crossScreenRowsInput, setCrossScreenRowsInput] = React.useState("1");
+  const [crossScreenColsInput, setCrossScreenColsInput] = React.useState("1");
+  const [crossScreenIds, setCrossScreenIds] = React.useState<string[][]>([[""]]);
+
+  // 当行列变化时更新网格数组
+  const handleCrossScreenGridChange = (newRows: number, newCols: number) => {
+    const rows = Math.max(0, Math.min(10, newRows));
+    const cols = Math.max(0, Math.min(10, newCols));
+    setCrossScreenRows(rows);
+    setCrossScreenCols(cols);
+    if (rows > 0 && cols > 0) {
+      setCrossScreenIds(
+        Array(rows).fill(null).map((_, rowIdx) =>
+          Array(cols).fill(null).map((_, colIdx) =>
+            crossScreenIds[rowIdx]?.[colIdx] || ""
+          )
+        )
+      );
+    }
+  };
+
+  // 处理行数输入
+  const handleRowsInputChange = (value: string) => {
+    setCrossScreenRowsInput(value);
+    const num = parseInt(value);
+    if (!isNaN(num)) {
+      handleCrossScreenGridChange(num, crossScreenCols);
+    }
+  };
+
+  // 处理列数输入
+  const handleColsInputChange = (value: string) => {
+    setCrossScreenColsInput(value);
+    const num = parseInt(value);
+    if (!isNaN(num)) {
+      handleCrossScreenGridChange(crossScreenRows, num);
+    }
+  };
+
+  // 失去焦点时处理空值
+  const handleRowsBlur = () => {
+    if (crossScreenRowsInput === "" || parseInt(crossScreenRowsInput) < 1) {
+      setCrossScreenRowsInput("1");
+      handleCrossScreenGridChange(1, crossScreenCols);
+    }
+  };
+
+  const handleColsBlur = () => {
+    if (crossScreenColsInput === "" || parseInt(crossScreenColsInput) < 1) {
+      setCrossScreenColsInput("1");
+      handleCrossScreenGridChange(crossScreenRows, 1);
+    }
+  };
+
+  // 更新单个网格的屏幕号
+  const handleScreenIdChange = (rowIdx: number, colIdx: number, value: string) => {
+    const newIds = crossScreenIds.map((row, rIdx) =>
+      row.map((cell, cIdx) => (rIdx === rowIdx && cIdx === colIdx ? value : cell))
+    );
+    setCrossScreenIds(newIds);
+  };
+
   // Navigation
   const currentItems = items.filter(item => item.parentId === currentFolderId);
   const filteredItems = currentItems.filter(item => 
@@ -142,10 +208,17 @@ export function MediaManagement() {
       parentId: currentFolderId,
       mode: formData.mode as MediaMode,
       orientation: formData.orientation as ScreenOrientation,
-      aspectRatio: ratio || "16:9",
+      aspectRatio: (ratio || "16:9") as AspectRatio,
       tags: formData.tags || [],
       status: "processing" as MediaStatus,
       updatedAt: new Date().toISOString(),
+      ...(formData.mode === "cross_screen" && {
+        crossScreenConfig: {
+          rows: crossScreenRows,
+          cols: crossScreenCols,
+          screenIds: crossScreenIds,
+        },
+      }),
     };
     setItems([...items, newContent]);
 
@@ -189,6 +262,12 @@ export function MediaManagement() {
     setCustomHeight("");
     setTagInput("");
     setEditingItem(null);
+    // 重置跨屏联动配置
+    setCrossScreenRows(1);
+    setCrossScreenCols(1);
+    setCrossScreenRowsInput("1");
+    setCrossScreenColsInput("1");
+    setCrossScreenIds([[""]]);
   };
 
   const handleDelete = (id: string) => {
@@ -202,6 +281,7 @@ export function MediaManagement() {
       case "image": return <ImageIcon className="h-4 w-4" />;
       case "webpage": return <Globe className="h-4 w-4" />;
       case "video_editor": return <Clock className="h-4 w-4" />;
+      case "cross_screen": return <Grid2X2 className="h-4 w-4" />;
       default: return <ImageIcon className="h-4 w-4" />;
     }
   };
@@ -826,7 +906,8 @@ export function MediaManagement() {
                   { id: "video", icon: Play, label: "Video" },
                   { id: "image", icon: ImageIcon, label: "Image" },
                   { id: "video_editor", icon: Clock, label: "Video Editor" },
-                  { id: "webpage", icon: Globe, label: "Webpage" }
+                  { id: "webpage", icon: Globe, label: "Webpage" },
+                  { id: "cross_screen", icon: Grid2X2, label: "跨屏联动" }
                 ].map((m) => (
                   <div key={m.id} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors w-[180px]">
                     <RadioGroupItem value={m.id} id={`mode-${m.id}`} />
@@ -953,6 +1034,83 @@ export function MediaManagement() {
                 )}
               </div>
             </div>
+
+            {/* 跨屏联动配置 - 在显示比例下方 */}
+            {formData.mode === "cross_screen" && (
+              <div className="grid gap-3 overflow-hidden">
+                <Label className="text-sm font-semibold">屏幕矩阵配置</Label>
+                <div className="space-y-4 overflow-hidden">
+                  <div className="flex items-center gap-4">
+                    <div className="grid gap-1.5 flex-1">
+                      <Label htmlFor="cross-rows" className="text-[10px] uppercase font-bold text-muted-foreground">行数</Label>
+                      <Input
+                        id="cross-rows"
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={crossScreenRowsInput}
+                        onChange={(e) => handleRowsInputChange(e.target.value)}
+                        onBlur={handleRowsBlur}
+                        className="h-9 font-mono"
+                      />
+                    </div>
+                    <div className="flex items-center mt-6 text-muted-foreground">
+                      <span className="font-bold">×</span>
+                    </div>
+                    <div className="grid gap-1.5 flex-1">
+                      <Label htmlFor="cross-cols" className="text-[10px] uppercase font-bold text-muted-foreground">列数</Label>
+                      <Input
+                        id="cross-cols"
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={crossScreenColsInput}
+                        onChange={(e) => handleColsInputChange(e.target.value)}
+                        onBlur={handleColsBlur}
+                        className="h-9 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 动态网格预览 */}
+                  {crossScreenRows > 0 && crossScreenCols > 0 && (
+                    <div className="space-y-2 overflow-hidden h-100">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">
+                        屏幕号配置 ({crossScreenRows}×{crossScreenCols})
+                      </Label>
+                      <div className="overflow-scroll h-100 rounded-xl border bg-muted/20 p-3">
+                        <div className="flex flex-col gap-3">
+                          {Array.from({ length: crossScreenRows }).map((_, rowIdx) => (
+                            <div key={rowIdx} className="flex flex-row gap-3">
+                              {Array.from({ length: crossScreenCols }).map((_, colIdx) => {
+                                const currentRatio = formData.aspectRatio === "custom"
+                                  ? `${customWidth || "?"}:${customHeight || "?"}`
+                                  : formData.aspectRatio;
+                                return (
+                                  <div key={colIdx} className="flex flex-col gap-1 shrink-0">
+                                    <div className="w-[160px] h-[90px] bg-background rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center">
+                                      <span className="text-xs text-primary font-bold">
+                                        {currentRatio}
+                                      </span>
+                                    </div>
+                                    <Input
+                                      placeholder="屏幕号"
+                                      value={crossScreenIds[rowIdx]?.[colIdx] || ""}
+                                      onChange={(e) => handleScreenIdChange(rowIdx, colIdx, e.target.value)}
+                                      className="w-[160px] h-7 text-xs text-center font-mono"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="p-4 bg-primary/5 rounded-lg flex items-start gap-3 border border-primary/10">
               <Settings2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
