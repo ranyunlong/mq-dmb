@@ -1074,11 +1074,11 @@ export function MediaManagement() {
 
                   {/* 动态网格预览 */}
                   {crossScreenRows > 0 && crossScreenCols > 0 && (
-                    <div className="space-y-2 overflow-hidden h-100">
+                    <div className="space-y-2 overflow-hidden">
                       <Label className="text-[10px] uppercase font-bold text-muted-foreground">
                         屏幕号配置 ({crossScreenRows}×{crossScreenCols})
                       </Label>
-                      <div className="overflow-scroll h-100 rounded-xl border bg-muted/20 p-3">
+                      <div className="overflow-scroll max-h-100 rounded-xl border bg-muted/20 p-3">
                         <div className="flex flex-col gap-3">
                           {Array.from({ length: crossScreenRows }).map((_, rowIdx) => (
                             <div key={rowIdx} className="flex flex-row gap-3">
@@ -1086,9 +1086,35 @@ export function MediaManagement() {
                                 const currentRatio = formData.aspectRatio === "custom"
                                   ? `${customWidth || "?"}:${customHeight || "?"}`
                                   : formData.aspectRatio;
+
+                                // 根据比例计算尺寸，长边固定160px
+                                let gridWidth = 160;
+                                let gridHeight = 90;
+
+                                let ratioW = 16, ratioH = 9;
+                                if (formData.aspectRatio === "custom") {
+                                  ratioW = parseInt(customWidth) || 16;
+                                  ratioH = parseInt(customHeight) || 9;
+                                } else if (formData.aspectRatio) {
+                                  [ratioW, ratioH] = formData.aspectRatio.split(":").map(Number);
+                                }
+
+                                if (ratioW >= ratioH) {
+                                  // 横屏或正方形：宽度160，高度按比例
+                                  gridWidth = 160;
+                                  gridHeight = Math.round(160 / ratioW * ratioH);
+                                } else {
+                                  // 竖屏：高度160，宽度按比例
+                                  gridHeight = 160;
+                                  gridWidth = Math.round(160 / ratioH * ratioW);
+                                }
+
                                 return (
                                   <div key={colIdx} className="flex flex-col gap-1 shrink-0">
-                                    <div className="w-[160px] h-[90px] bg-background rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center">
+                                    <div
+                                      className="bg-background rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center"
+                                      style={{ width: `${gridWidth}px`, height: `${gridHeight}px` }}
+                                    >
                                       <span className="text-xs text-primary font-bold">
                                         {currentRatio}
                                       </span>
@@ -1097,7 +1123,8 @@ export function MediaManagement() {
                                       placeholder="屏幕号"
                                       value={crossScreenIds[rowIdx]?.[colIdx] || ""}
                                       onChange={(e) => handleScreenIdChange(rowIdx, colIdx, e.target.value)}
-                                      className="w-[160px] h-7 text-xs text-center font-mono"
+                                      style={{ width: `${gridWidth}px` }}
+                                      className="h-7 text-xs text-center font-mono"
                                     />
                                   </div>
                                 );
