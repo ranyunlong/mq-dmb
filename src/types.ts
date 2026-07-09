@@ -24,7 +24,7 @@ export interface FileItem {
   skuId?: string; // Optional binding to a SKU
 }
 
-export type MediaMode = "carousel" | "video" | "image" | "webpage" | "video_editor" | "cross_screen";
+export type MediaMode = "carousel" | "video" | "image" | "webpage" | "video_editor";
 export type ScreenOrientation = "landscape" | "portrait";
 export type AspectRatio = "16:9" | "4:3" | "1:1" | "9:16" | "custom";
 export type MediaStatus = "processing" | "distributing" | "failed" | "published";

@@ -69,6 +69,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { MediaItem, MediaMode, ScreenOrientation, AspectRatio, MediaStatus, CrossScreenConfig } from "@/types";
 import { INITIAL_MEDIA_ITEMS } from "@/constants";
@@ -111,6 +112,7 @@ export function MediaManagement() {
   const [tagInput, setTagInput] = React.useState("");
 
   // 跨屏联动配置状态
+  const [crossScreenEnabled, setCrossScreenEnabled] = React.useState(false);
   const [crossScreenRows, setCrossScreenRows] = React.useState(1);
   const [crossScreenCols, setCrossScreenCols] = React.useState(1);
   const [crossScreenRowsInput, setCrossScreenRowsInput] = React.useState("1");
@@ -212,7 +214,7 @@ export function MediaManagement() {
       tags: formData.tags || [],
       status: "processing" as MediaStatus,
       updatedAt: new Date().toISOString(),
-      ...(formData.mode === "cross_screen" && {
+      ...((formData.mode === "carousel" || formData.mode === "video") && crossScreenEnabled && {
         crossScreenConfig: {
           rows: crossScreenRows,
           cols: crossScreenCols,
@@ -263,6 +265,7 @@ export function MediaManagement() {
     setTagInput("");
     setEditingItem(null);
     // 重置跨屏联动配置
+    setCrossScreenEnabled(false);
     setCrossScreenRows(1);
     setCrossScreenCols(1);
     setCrossScreenRowsInput("1");
@@ -281,7 +284,6 @@ export function MediaManagement() {
       case "image": return <ImageIcon className="h-4 w-4" />;
       case "webpage": return <Globe className="h-4 w-4" />;
       case "video_editor": return <Clock className="h-4 w-4" />;
-      case "cross_screen": return <Grid2X2 className="h-4 w-4" />;
       default: return <ImageIcon className="h-4 w-4" />;
     }
   };
@@ -906,8 +908,7 @@ export function MediaManagement() {
                   { id: "video", icon: Play, label: "Video" },
                   { id: "image", icon: ImageIcon, label: "Image" },
                   { id: "video_editor", icon: Clock, label: "Video Editor" },
-                  { id: "webpage", icon: Globe, label: "Webpage" },
-                  { id: "cross_screen", icon: Grid2X2, label: "跨屏联动" }
+                  { id: "webpage", icon: Globe, label: "Webpage" }
                 ].map((m) => (
                   <div key={m.id} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors w-[180px]">
                     <RadioGroupItem value={m.id} id={`mode-${m.id}`} />
@@ -919,6 +920,23 @@ export function MediaManagement() {
                 ))}
               </RadioGroup>
             </div>
+
+            {/* 跨屏联动开关 - 仅在轮播和视频模式下显示 */}
+            {(formData.mode === "carousel" || formData.mode === "video") && (
+              <div className="flex items-center justify-between p-4 rounded-xl border bg-muted/20">
+                <div className="flex items-center gap-3">
+                  <Grid2X2 className="h-5 w-5 text-primary" />
+                  <div>
+                    <Label className="text-sm font-semibold">跨屏联动</Label>
+                    <p className="text-xs text-muted-foreground">合成视频指定各个区域由哪个屏幕播放</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={crossScreenEnabled}
+                  onCheckedChange={setCrossScreenEnabled}
+                />
+              </div>
+            )}
 
             {/* Orientation Selection */}
             <div className="grid gap-3">
@@ -1036,7 +1054,7 @@ export function MediaManagement() {
             </div>
 
             {/* 跨屏联动配置 - 在显示比例下方 */}
-            {formData.mode === "cross_screen" && (
+            {(formData.mode === "carousel" || formData.mode === "video") && crossScreenEnabled && (
               <div className="grid gap-3 overflow-hidden">
                 <Label className="text-sm font-semibold">屏幕矩阵配置</Label>
                 <div className="space-y-4 overflow-hidden">
