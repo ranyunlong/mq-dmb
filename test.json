@@ -1,0 +1,26 @@
+{
+    "2026-06-15": {
+        "screenSchedules": {
+            "1#": { // by week
+                "startTime": "00:00",
+                "endTime": "22:33",
+                "repeatMode": "week",
+                "repeatData": [1, 2],
+                "mediaId": "me001",
+                "mediaName": "早餐食品",
+                "mediaUrl": "http://xx.jpg"
+            },
+            "2#": { // by day
+                "startTime": "00:00",
+                "endTime": "22:33",
+                "repeatMode": "day", 
+                "startDate": "2026-06-22",
+                "endDate": "2026-06-30",
+                "mediaId": "me002",
+                "mediaName": "咖啡视频",
+                "mediaUrl": "http://xx.jpg"
+            }
+        },
+        "screens": ["1#", "2#"]
+    }
+}

@@ -40,10 +40,34 @@ export function MediaEditor() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
+  const contentId = searchParams.get("id");
   const mode = searchParams.get("mode") || "image";
   const orientation = searchParams.get("orientation") || "landscape";
   const ratio = searchParams.get("ratio") || "16:9";
+
+  const handleSave = () => {
+    if (contentId) {
+      // Get existing items from localStorage
+      const stored = localStorage.getItem("media-items");
+      const items = stored ? JSON.parse(stored) : [];
+
+      // Update the item
+      const updatedItems = items.map((item: any) => {
+        if (item.id === contentId) {
+          return {
+            ...item,
+            status: "published" as const,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return item;
+      });
+
+      localStorage.setItem("media-items", JSON.stringify(updatedItems));
+    }
+    navigate("/media-content");
+  };
   
   // Editor State
   const [carouselItems, setCarouselItems] = React.useState<CarouselItem[]>([
@@ -380,7 +404,7 @@ export function MediaEditor() {
              <Separator orientation="vertical" className="h-4" />
              <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold uppercase">{t("Export")}</Button>
           </div>
-          <Button size="sm" className="h-9 px-6 bg-primary hover:bg-primary/90 font-bold uppercase tracking-wider shadow-lg shadow-primary/20">
+          <Button size="sm" className="h-9 px-6 bg-primary hover:bg-primary/90 font-bold uppercase tracking-wider shadow-lg shadow-primary/20" onClick={handleSave}>
             <Save className="mr-2 h-4 w-4" />
             {t("Save")}
           </Button>

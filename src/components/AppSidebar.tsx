@@ -16,7 +16,8 @@ import {
   FolderTree,
   Package,
   Layout,
-  CalendarDays
+  CalendarDays,
+  Type
 } from "lucide-react";
 import {
   Sidebar,
@@ -89,6 +90,11 @@ const items = [
     title: "File Management",
     url: "/files",
     icon: FolderTree,
+  },
+  {
+    title: "Font Library",
+    url: "/fonts",
+    icon: Type,
   },
   {
     title: "SKU Management",

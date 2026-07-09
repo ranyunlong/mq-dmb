@@ -24,6 +24,22 @@ export interface FileItem {
   skuId?: string; // Optional binding to a SKU
 }
 
+export type FontFormat = "TTF" | "OTF" | "WOFF" | "WOFF2";
+
+export interface FontItem {
+  id: string;
+  name: string; // Display name, e.g. "Source Han Sans"
+  fileName: string; // Original file name, e.g. "SourceHanSans-Regular.ttf"
+  format: FontFormat;
+  size: number; // In bytes
+  foundry?: string; // Font foundry / publisher
+  styleCount?: number; // Number of weights / styles in the family
+  uploader: string;
+  uploadedAt: string;
+  status?: "active" | "disabled";
+  tags?: string[];
+}
+
 export type MediaMode = "carousel" | "video" | "image" | "webpage" | "video_editor";
 export type ScreenOrientation = "landscape" | "portrait";
 export type AspectRatio = "16:9" | "4:3" | "1:1" | "9:16" | "custom";
@@ -61,6 +77,7 @@ export interface ScheduleLog {
 
 export interface Schedule {
   id: string;
+  name?: string;
   startTime: string;
   endTime: string;
   mediaId: string; // Reference to MediaItem
@@ -76,4 +93,37 @@ export interface Schedule {
   totalTargets: number; // For batch publishing progress (e.g., 10000 stores)
   completedTargets: number;
   publishLogs?: ScheduleLog[];
+  screens?: string[];
+  screenSchedules?: Record<
+          string,
+          Array<{
+            startTime: string;
+            endTime: string;
+            repeatMode: "week" | "day";
+            repeatData?: number[];
+            startDate?: string;
+            endDate?: string;
+            mediaId: string;
+            mediaName: string;
+            mediaUrl?: string;
+          }>
+        >;
+  selectedDate?: string;
+  screenSchedulesByDate?: Record<string, {
+    screens: string[];
+    screenSchedules: Record<
+          string,
+          Array<{
+            startTime: string;
+            endTime: string;
+            repeatMode: "week" | "day";
+            repeatData?: number[];
+            startDate?: string;
+            endDate?: string;
+            mediaId: string;
+            mediaName: string;
+            mediaUrl?: string;
+          }>
+        >;
+  }>;
 }

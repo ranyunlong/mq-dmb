@@ -11,11 +11,13 @@ import { OrganizationManagement } from "@/components/OrganizationManagement";
 import { DeviceManagement } from "@/components/DeviceManagement";
 import { RoleManagement } from "@/components/RoleManagement";
 import { FileManager } from "@/components/FileManager";
+import { FontLibrary } from "@/components/FontLibrary";
 import { AssetDesign } from "@/components/AssetDesign";
 import { SkuManagement } from "@/components/SkuManagement";
 import { MediaManagement } from "@/components/MediaManagement";
 import { ScheduleManagement } from "@/components/ScheduleManagement";
 import { ScheduleCreator } from "@/components/ScheduleCreator";
+import { ScheduleEditor } from "@/components/ScheduleEditor";
 import { MediaEditor } from "@/components/MediaEditor";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -113,12 +115,14 @@ export default function App() {
                     <Route path="/devices" element={<DeviceManagement />} />
                     <Route path="/roles" element={<RoleManagement />} />
                     <Route path="/files" element={<FileManager />} />
+                    <Route path="/fonts" element={<FontLibrary />} />
                     <Route path="/asset-design" element={<AssetDesign />} />
                     <Route path="/skus" element={<SkuManagement />} />
                     <Route path="/media-content" element={<MediaManagement />} />
                     <Route path="/media-editor" element={<MediaEditor />} />
                     <Route path="/schedules" element={<ScheduleManagement />} />
                     <Route path="/schedules/create" element={<ScheduleCreator />} />
+                    <Route path="/schedules/edit/:id" element={<ScheduleEditor />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Dashboard />} />
                   </Routes>

@@ -73,7 +73,22 @@ import { INITIAL_SCHEDULES, INITIAL_MEDIA_ITEMS } from "@/constants";
 export function ScheduleManagement() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [schedules, setSchedules] = React.useState<Schedule[]>(INITIAL_SCHEDULES);
+  const [schedules, setSchedules] = React.useState<Schedule[]>(() => {
+    const saved = localStorage.getItem("schedules");
+    if (saved) {
+      return JSON.parse(saved);
+    } else {
+      localStorage.setItem("schedules", JSON.stringify(INITIAL_SCHEDULES));
+      return INITIAL_SCHEDULES;
+    }
+  });
+
+  React.useEffect(() => {
+    if (!localStorage.getItem("schedules")) {
+      localStorage.setItem("schedules", JSON.stringify(INITIAL_SCHEDULES));
+    }
+  }, []);
+
   const [mediaItems] = React.useState<MediaItem[]>(INITIAL_MEDIA_ITEMS);
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("list");
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -117,7 +132,9 @@ export function ScheduleManagement() {
   };
 
   const handleDelete = (id: string) => {
-    setSchedules(schedules.filter(s => s.id !== id));
+    const nextLocal = schedules.filter(s => s.id !== id);
+    setSchedules(nextLocal);
+    localStorage.setItem("schedules", JSON.stringify(nextLocal));
   };
 
   return (
@@ -190,12 +207,35 @@ export function ScheduleManagement() {
                     <h3 className="font-bold text-base leading-tight group-hover:text-primary transition-colors line-clamp-1">{schedule.mediaName}</h3>
                     <div className="flex items-center gap-2">
                        <Badge variant="outline" className="text-[10px] font-mono h-5 bg-background">{schedule.id}</Badge>
-                       <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{t(schedule.repeat)}</span>
+
                     </div>
                   </div>
-                  <Badge className={cn("border-none text-[10px] uppercase font-bold", getStatusConfig(schedule.status).color)}>
-                    {getStatusConfig(schedule.status).label}
-                  </Badge>
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <Badge className={cn("border-none text-[10px] uppercase font-bold", getStatusConfig(schedule.status).color)}>
+                      {getStatusConfig(schedule.status).label}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={(props) => (
+                        <Button {...props} variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-muted">
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </Button>
+                      )} />
+                      <DropdownMenuContent align="end" className="w-[160px]">
+                        <DropdownMenuItem className="gap-2" onClick={() => navigate(`/schedules/create?id=${schedule.id}`)}>
+                          <Edit className="h-4 w-4" />
+                          <span>编辑基本信息</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2" onClick={() => navigate(`/schedules/edit/${schedule.id}`)}>
+                          <Calendar className="h-4 w-4" />
+                          <span>修改日程计划</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2 text-destructive" onClick={() => handleDelete(schedule.id)}>
+                          <Trash2 className="h-4 w-4" />
+                          <span>{t("Delete")}</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
 
@@ -269,7 +309,7 @@ export function ScheduleManagement() {
                 <TableHead className="font-bold">{t("Schedule Information")}</TableHead>
                 <TableHead className="font-bold">{t("Time Window")}</TableHead>
                 <TableHead className="font-bold">{t("Progress")}</TableHead>
-                <TableHead className="font-bold text-center">{t("Repeat")}</TableHead>
+
                 <TableHead className="font-bold">{t("Publish Status")}</TableHead>
                 <TableHead className="font-bold">{t("Status")}</TableHead>
                 <TableHead className="text-right font-bold">{t("Actions")}</TableHead>
@@ -313,9 +353,7 @@ export function ScheduleManagement() {
                       <Progress value={calculateProgress(schedule.startTime, schedule.endTime)} className="h-1.5" />
                     </div>
                   </TableCell>
-                  <TableCell className="text-center font-bold text-[10px] uppercase text-muted-foreground italic">
-                    {t(schedule.repeat)}
-                  </TableCell>
+
                   <TableCell>
                     <div className={cn(
                       "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold",
@@ -340,13 +378,17 @@ export function ScheduleManagement() {
                         </Button>
                       )} />
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="gap-2">
+                        <DropdownMenuItem className="gap-2" onClick={() => navigate(`/schedules/create?id=${schedule.id}`)}>
                           <Edit className="h-4 w-4" />
-                          {t("Edit")}
+                          <span>编辑基本信息</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2" onClick={() => navigate(`/schedules/edit/${schedule.id}`)}>
+                          <Calendar className="h-4 w-4" />
+                          <span>修改日程计划</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem className="gap-2 text-destructive" onClick={() => handleDelete(schedule.id)}>
                           <Trash2 className="h-4 w-4" />
-                          {t("Delete")}
+                          <span>{t("Delete")}</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -391,7 +433,7 @@ export function ScheduleManagement() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5 p-3 bg-card border rounded-2xl shadow-sm">
                     <Label className="text-[10px] uppercase font-bold text-muted-foreground">{t("Publisher")}</Label>
                     <div className="flex items-center gap-2 font-bold text-sm">
@@ -406,7 +448,7 @@ export function ScheduleManagement() {
                       {new Date(selectedSchedule.publishedAt).toLocaleDateString()}
                     </div>
                   </div>
-                  <div className="space-y-1.5 p-3 bg-card border rounded-2xl shadow-sm">
+                  <div className="hidden">
                     <Label className="text-[10px] uppercase font-bold text-muted-foreground">{t("Repetition")}</Label>
                     <div className="flex items-center gap-2 font-bold text-sm capitalize">
                       <CalendarDays className="h-4 w-4 text-primary" />

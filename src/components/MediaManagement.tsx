@@ -881,7 +881,7 @@ export function MediaManagement() {
                 id="content-name"
                 placeholder="请输入内容名称"
                 value={formData.name || ""}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
                 className="h-10"
               />
             </div>
