@@ -1,20 +1,20 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { 
-  Monitor, 
-  Layout, 
-  Play, 
-  Image as ImageIcon, 
-  Globe, 
-  ChevronRight, 
-  Folder, 
-  Grid, 
-  List as ListIcon, 
-  Plus, 
-  Search, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
+import {
+  Monitor,
+  Layout,
+  Play,
+  Image as ImageIcon,
+  Globe,
+  ChevronRight,
+  Folder,
+  Grid,
+  List as ListIcon,
+  Plus,
+  Search,
+  MoreVertical,
+  Edit,
+  Trash2,
   FolderPlus,
   ArrowLeft,
   ChevronDown,
@@ -27,20 +27,21 @@ import {
   AlertCircle,
   RefreshCw,
   Eye,
-  Zap
+  Zap,
+  Grid2X2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import {
   Dialog,
@@ -53,21 +54,13 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
+  DropdownMenuItem, 
+  DropdownMenuTrigger, 
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { MediaItem, MediaMode, ScreenOrientation, AspectRatio, MediaStatus } from "@/types";
 import { INITIAL_MEDIA_ITEMS } from "@/constants";
@@ -75,11 +68,19 @@ import { INITIAL_MEDIA_ITEMS } from "@/constants";
 export function MediaManagement() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [items, setItems] = React.useState<MediaItem[]>(INITIAL_MEDIA_ITEMS);
+  const [items, setItems] = React.useState<MediaItem[]>(() => {
+    const stored = localStorage.getItem("media-items");
+    return stored ? JSON.parse(stored) : INITIAL_MEDIA_ITEMS;
+  });
+
+  // Sync to localStorage whenever items change
+  React.useEffect(() => {
+    localStorage.setItem("media-items", JSON.stringify(items));
+  }, [items]);
   const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null);
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = React.useState("");
-  
+
   // Dialog States
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
   const [isFolderDialogOpen, setIsFolderDialogOpen] = React.useState(false);
@@ -88,9 +89,10 @@ export function MediaManagement() {
   const [isLogsExpanded, setIsLogsExpanded] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<MediaItem | null>(null);
   const [selectedItem, setSelectedItem] = React.useState<MediaItem | null>(null);
-  
+
   // Form States
   const [formData, setFormData] = React.useState<Partial<MediaItem>>({
+    name: "",
     mode: "image",
     orientation: "landscape",
     aspectRatio: "16:9",
@@ -100,9 +102,75 @@ export function MediaManagement() {
   const [folderName, setFolderName] = React.useState("");
   const [tagInput, setTagInput] = React.useState("");
 
+  // 跨屏联动配置状态
+  const [crossScreenEnabled, setCrossScreenEnabled] = React.useState(false);
+  const [crossScreenRows, setCrossScreenRows] = React.useState(1);
+  const [crossScreenCols, setCrossScreenCols] = React.useState(1);
+  const [crossScreenRowsInput, setCrossScreenRowsInput] = React.useState("1");
+  const [crossScreenColsInput, setCrossScreenColsInput] = React.useState("1");
+  const [crossScreenIds, setCrossScreenIds] = React.useState<string[][]>([[""]]);
+
+  // 当行列变化时更新网格数组
+  const handleCrossScreenGridChange = (newRows: number, newCols: number) => {
+    const rows = Math.max(0, Math.min(10, newRows));
+    const cols = Math.max(0, Math.min(10, newCols));
+    setCrossScreenRows(rows);
+    setCrossScreenCols(cols);
+    if (rows > 0 && cols > 0) {
+      setCrossScreenIds(
+        Array(rows).fill(null).map((_, rowIdx) =>
+          Array(cols).fill(null).map((_, colIdx) =>
+            crossScreenIds[rowIdx]?.[colIdx] || ""
+          )
+        )
+      );
+    }
+  };
+
+  // 处理行数输入
+  const handleRowsInputChange = (value: string) => {
+    setCrossScreenRowsInput(value);
+    const num = parseInt(value);
+    if (!isNaN(num)) {
+      handleCrossScreenGridChange(num, crossScreenCols);
+    }
+  };
+
+  // 处理列数输入
+  const handleColsInputChange = (value: string) => {
+    setCrossScreenColsInput(value);
+    const num = parseInt(value);
+    if (!isNaN(num)) {
+      handleCrossScreenGridChange(crossScreenRows, num);
+    }
+  };
+
+  // 失去焦点时处理空值
+  const handleRowsBlur = () => {
+    if (crossScreenRowsInput === "" || parseInt(crossScreenRowsInput) < 1) {
+      setCrossScreenRowsInput("1");
+      handleCrossScreenGridChange(1, crossScreenCols);
+    }
+  };
+
+  const handleColsBlur = () => {
+    if (crossScreenColsInput === "" || parseInt(crossScreenColsInput) < 1) {
+      setCrossScreenColsInput("1");
+      handleCrossScreenGridChange(crossScreenRows, 1);
+    }
+  };
+
+  // 更新单个网格的屏幕号
+  const handleScreenIdChange = (rowIdx: number, colIdx: number, value: string) => {
+    const newIds = crossScreenIds.map((row, rIdx) =>
+      row.map((cell, cIdx) => (rIdx === rowIdx && cIdx === colIdx ? value : cell))
+    );
+    setCrossScreenIds(newIds);
+  };
+
   // Navigation
   const currentItems = items.filter(item => item.parentId === currentFolderId);
-  const filteredItems = currentItems.filter(item => 
+  const filteredItems = currentItems.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -124,14 +192,39 @@ export function MediaManagement() {
 
   const handleCreateContent = () => {
     const ratio = formData.aspectRatio === "custom" ? `${customWidth}:${customHeight}` : formData.aspectRatio;
+
+    // Create content item in current folder
+    const newContent: MediaItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: formData.name || "Untitled",
+      type: "content",
+      parentId: currentFolderId,
+      mode: formData.mode as MediaMode,
+      orientation: formData.orientation as ScreenOrientation,
+      aspectRatio: (ratio || "16:9") as AspectRatio,
+      tags: formData.tags || [],
+      status: "processing" as MediaStatus,
+      updatedAt: new Date().toISOString(),
+      ...((formData.mode === "carousel" || formData.mode === "video") && crossScreenEnabled && {
+        crossScreenConfig: {
+          rows: crossScreenRows,
+          cols: crossScreenCols,
+          screenIds: crossScreenIds,
+        },
+      }),
+    };
+    setItems([...items, newContent]);
+
     const searchParams = new URLSearchParams({
+      id: newContent.id,
+      name: formData.name || "",
       mode: formData.mode || "image",
       orientation: formData.orientation || "landscape",
       ratio: ratio || "16:9",
       parentId: currentFolderId || "",
       tags: (formData.tags || []).join(",")
     });
-    
+
     navigate(`/media-editor?${searchParams.toString()}`);
     setIsCreateDialogOpen(false);
     resetForm();
@@ -152,6 +245,7 @@ export function MediaManagement() {
 
   const resetForm = () => {
     setFormData({
+      name: "",
       mode: "image",
       orientation: "landscape",
       aspectRatio: "16:9",
@@ -161,6 +255,13 @@ export function MediaManagement() {
     setCustomHeight("");
     setTagInput("");
     setEditingItem(null);
+    // 重置跨屏联动配置
+    setCrossScreenEnabled(false);
+    setCrossScreenRows(1);
+    setCrossScreenCols(1);
+    setCrossScreenRowsInput("1");
+    setCrossScreenColsInput("1");
+    setCrossScreenIds([[""]]);
   };
 
   const handleDelete = (id: string) => {
@@ -275,7 +376,7 @@ export function MediaManagement() {
             {breadcrumbs.map((crumb, idx) => (
               <React.Fragment key={crumb.id || "root"}>
                 {idx > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
-                <button 
+                <button
                   onClick={() => setCurrentFolderId(crumb.id)}
                   className={cn(
                     "px-2 py-1 rounded hover:bg-muted transition-colors shrink-0",
@@ -292,7 +393,7 @@ export function MediaManagement() {
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative w-64">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
+            <Input
               placeholder={t("Search media...")}
               className="pl-8 h-9"
               value={searchQuery}
@@ -300,17 +401,17 @@ export function MediaManagement() {
             />
           </div>
           <div className="flex items-center border rounded-md p-1 bg-muted/20">
-            <Button 
-              variant={viewMode === "grid" ? "secondary" : "ghost"} 
-              size="icon" 
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="icon"
               className="h-7 w-7"
               onClick={() => setViewMode("grid")}
             >
               <Grid className="h-4 w-4" />
             </Button>
-            <Button 
-              variant={viewMode === "list" ? "secondary" : "ghost"} 
-              size="icon" 
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="icon"
               className="h-7 w-7"
               onClick={() => setViewMode("list")}
             >
@@ -324,7 +425,7 @@ export function MediaManagement() {
       {viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           {filteredItems.map((item) => (
-            <div 
+            <div
               key={item.id}
               className={cn(
                 "group relative border rounded-xl overflow-hidden bg-card hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-md",
@@ -357,8 +458,8 @@ export function MediaManagement() {
                         "absolute bottom-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded border backdrop-blur-md text-[8px] font-bold uppercase tracking-tight",
                         getStatusConfig(item.status)?.color
                       )}>
-                        {React.createElement(getStatusConfig(item.status)!.icon, { 
-                          className: cn("h-2.5 w-2.5", getStatusConfig(item.status)!.animate) 
+                        {React.createElement(getStatusConfig(item.status)!.icon, {
+                          className: cn("h-2.5 w-2.5", getStatusConfig(item.status)!.animate)
                         })}
                         {getStatusConfig(item.status)?.label}
                       </div>
@@ -418,8 +519,8 @@ export function MediaManagement() {
             </TableHeader>
             <TableBody>
               {filteredItems.map((item) => (
-                <TableRow 
-                  key={item.id} 
+                <TableRow
+                  key={item.id}
                   className="cursor-pointer group"
                   onClick={() => handleItemClick(item)}
                 >
@@ -452,8 +553,8 @@ export function MediaManagement() {
                         "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold",
                         getStatusConfig(item.status)?.color
                       )}>
-                        {React.createElement(getStatusConfig(item.status)!.icon, { 
-                          className: cn("h-3 w-3", getStatusConfig(item.status)!.animate) 
+                        {React.createElement(getStatusConfig(item.status)!.icon, {
+                          className: cn("h-3 w-3", getStatusConfig(item.status)!.animate)
                         })}
                         {getStatusConfig(item.status)?.label}
                       </div>
@@ -514,8 +615,8 @@ export function MediaManagement() {
                       "flex items-center gap-2 text-sm font-bold",
                       getStatusConfig(selectedItem.status)?.color.split(' ')[0]
                     )}>
-                      {getStatusConfig(selectedItem.status) && React.createElement(getStatusConfig(selectedItem.status)!.icon, { 
-                        className: cn("h-4 w-4", getStatusConfig(selectedItem.status)!.animate) 
+                      {getStatusConfig(selectedItem.status) && React.createElement(getStatusConfig(selectedItem.status)!.icon, {
+                        className: cn("h-4 w-4", getStatusConfig(selectedItem.status)!.animate)
                       })}
                       {getStatusConfig(selectedItem.status)?.label || t("Unknown")}
                     </div>
@@ -528,9 +629,9 @@ export function MediaManagement() {
                         </Badge>
                       ))}
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="h-8 gap-2 text-xs font-bold"
                       onClick={() => setIsLogsExpanded(!isLogsExpanded)}
                     >
@@ -622,8 +723,8 @@ export function MediaManagement() {
                     <span className="text-xs text-muted-foreground italic px-1">{t("No tags added")}</span>
                   )}
                   <div className="flex items-center gap-2 ml-auto">
-                    <Input 
-                      placeholder={t("Add tag...")} 
+                    <Input
+                      placeholder={t("Add tag...")}
                       className="h-7 text-xs w-24"
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
@@ -665,8 +766,8 @@ export function MediaManagement() {
                 <Edit className="h-4 w-4" />
                 {t("Edit")}
               </Button>
-              <Button 
-                disabled={selectedItem?.status === "processing"} 
+              <Button
+                disabled={selectedItem?.status === "processing"}
                 className="gap-2"
                 onClick={() => setIsPreviewOpen(true)}
               >
@@ -680,7 +781,7 @@ export function MediaManagement() {
 
       {/* Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent 
+        <DialogContent
           showCloseButton={false}
           className={cn(
             "p-0 overflow-hidden border-none bg-black/95",
@@ -695,8 +796,8 @@ export function MediaManagement() {
               )}>
                 {selectedItem.status === "published" ? (
                   <div className="w-full h-full flex items-center justify-center relative overflow-hidden">
-                    <img 
-                      src={`https://picsum.photos/seed/${selectedItem.id}/1920/1080`} 
+                    <img
+                      src={`https://picsum.photos/seed/${selectedItem.id}/1920/1080`}
                       alt={selectedItem.name}
                       className="w-full h-full object-contain"
                       referrerPolicy="no-referrer"
@@ -718,10 +819,10 @@ export function MediaManagement() {
                     <p className="font-bold tracking-widest uppercase text-xs">{t("Synthesizing Content...")}</p>
                   </div>
                 )}
-                
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="absolute top-4 right-4 h-10 w-10 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md"
                   onClick={() => setIsPreviewOpen(false)}
                 >
@@ -744,9 +845,9 @@ export function MediaManagement() {
           </DialogHeader>
           <div className="py-4">
             <Label htmlFor="folder-name">{t("Folder Name")}</Label>
-            <Input 
-              id="folder-name" 
-              placeholder={t("e.g. Campaign Alpha")} 
+            <Input
+              id="folder-name"
+              placeholder={t("e.g. Campaign Alpha")}
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
               className="mt-2"
@@ -771,14 +872,26 @@ export function MediaManagement() {
               {t("Configure your media output properties and enter the design editor.")}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-6 py-6 px-1">
+            {/* Name Input */}
+            <div className="grid gap-3">
+              <Label htmlFor="content-name" className="text-sm font-semibold">内容名称</Label>
+              <Input
+                id="content-name"
+                placeholder="请输入内容名称"
+                value={formData.name || ""}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="h-10"
+              />
+            </div>
+
             {/* Mode Selection */}
             <div className="grid gap-3">
               <Label className="text-sm font-semibold">{t("Mode")}</Label>
-              <RadioGroup 
-                value={formData.mode} 
-                onValueChange={(v) => setFormData({...formData, mode: v as MediaMode})}
+              <RadioGroup
+                value={formData.mode}
+                onValueChange={(v) => setFormData({ ...formData, mode: v as MediaMode })}
                 className="flex flex-wrap gap-4"
               >
                 {[
@@ -799,12 +912,29 @@ export function MediaManagement() {
               </RadioGroup>
             </div>
 
+            {/* 跨屏联动开关 - 仅在轮播和视频模式下显示 */}
+            {(formData.mode === "carousel" || formData.mode === "video") && (
+              <div className="flex items-center justify-between p-4 rounded-xl border bg-muted/20">
+                <div className="flex items-center gap-3">
+                  <Grid2X2 className="h-5 w-5 text-primary" />
+                  <div>
+                    <Label className="text-sm font-semibold">跨屏联动</Label>
+                    <p className="text-xs text-muted-foreground">合成视频指定各个区域由哪个屏幕播放</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={crossScreenEnabled}
+                  onCheckedChange={setCrossScreenEnabled}
+                />
+              </div>
+            )}
+
             {/* Orientation Selection */}
             <div className="grid gap-3">
               <Label className="text-sm font-semibold">{t("Orientation")}</Label>
-              <RadioGroup 
-                value={formData.orientation} 
-                onValueChange={(v) => setFormData({...formData, orientation: v as ScreenOrientation})}
+              <RadioGroup
+                value={formData.orientation}
+                onValueChange={(v) => setFormData({ ...formData, orientation: v as ScreenOrientation })}
                 className="flex gap-4"
               >
                 <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors w-[180px]">
@@ -831,10 +961,10 @@ export function MediaManagement() {
                 {formData.tags?.map(tag => (
                   <Badge key={tag} variant="secondary" className="flex items-center gap-1 py-1.5 px-3">
                     {tag}
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-4 w-4 hover:bg-transparent" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 hover:bg-transparent"
                       onClick={() => handleRemoveTag(tag)}
                     >
                       <Plus className="h-3 w-3 rotate-45" />
@@ -842,8 +972,8 @@ export function MediaManagement() {
                   </Badge>
                 ))}
                 <div className="flex items-center gap-2">
-                  <Input 
-                    placeholder={t("Add tag...")} 
+                  <Input
+                    placeholder={t("Add tag...")}
                     className="h-9 w-32"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
@@ -863,9 +993,9 @@ export function MediaManagement() {
             <div className="grid gap-3">
               <Label className="text-sm font-semibold">{t("Display Ratio")}</Label>
               <div className="space-y-4">
-                <RadioGroup 
-                  value={formData.aspectRatio} 
-                  onValueChange={(v) => setFormData({...formData, aspectRatio: v as AspectRatio})}
+                <RadioGroup
+                  value={formData.aspectRatio}
+                  onValueChange={(v) => setFormData({ ...formData, aspectRatio: v as AspectRatio })}
                   className="flex flex-wrap gap-4"
                 >
                   {["16:9", "4:3", "1:1", "9:16", "21:9", "custom"].map((r) => (
@@ -877,16 +1007,16 @@ export function MediaManagement() {
                     </div>
                   ))}
                 </RadioGroup>
-                
+
                 {formData.aspectRatio === "custom" && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="flex items-center gap-3 bg-muted/30 p-4 rounded-xl border border-dashed"
                   >
                     <div className="grid gap-1.5 flex-1">
                       <Label htmlFor="custom-width" className="text-[10px] uppercase font-bold text-muted-foreground">{t("Width")}</Label>
-                      <Input 
+                      <Input
                         id="custom-width"
                         placeholder="1920"
                         value={customWidth}
@@ -900,7 +1030,7 @@ export function MediaManagement() {
                     </div>
                     <div className="grid gap-1.5 flex-1">
                       <Label htmlFor="custom-height" className="text-[10px] uppercase font-bold text-muted-foreground">{t("Height")}</Label>
-                      <Input 
+                      <Input
                         id="custom-height"
                         placeholder="1080"
                         value={customHeight}
@@ -914,6 +1044,110 @@ export function MediaManagement() {
               </div>
             </div>
 
+            {/* 跨屏联动配置 - 在显示比例下方 */}
+            {(formData.mode === "carousel" || formData.mode === "video") && crossScreenEnabled && (
+              <div className="grid gap-3 overflow-hidden">
+                <Label className="text-sm font-semibold">屏幕矩阵配置</Label>
+                <div className="space-y-4 overflow-hidden">
+                  <div className="flex items-center gap-4">
+                    <div className="grid gap-1.5 flex-1">
+                      <Label htmlFor="cross-rows" className="text-[10px] uppercase font-bold text-muted-foreground">行数</Label>
+                      <Input
+                        id="cross-rows"
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={crossScreenRowsInput}
+                        onChange={(e) => handleRowsInputChange(e.target.value)}
+                        onBlur={handleRowsBlur}
+                        className="h-9 font-mono"
+                      />
+                    </div>
+                    <div className="flex items-center mt-6 text-muted-foreground">
+                      <span className="font-bold">×</span>
+                    </div>
+                    <div className="grid gap-1.5 flex-1">
+                      <Label htmlFor="cross-cols" className="text-[10px] uppercase font-bold text-muted-foreground">列数</Label>
+                      <Input
+                        id="cross-cols"
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={crossScreenColsInput}
+                        onChange={(e) => handleColsInputChange(e.target.value)}
+                        onBlur={handleColsBlur}
+                        className="h-9 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 动态网格预览 */}
+                  {crossScreenRows > 0 && crossScreenCols > 0 && (
+                    <div className="space-y-2 overflow-hidden">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">
+                        屏幕号配置 ({crossScreenRows}×{crossScreenCols})
+                      </Label>
+                      <div className="overflow-scroll max-h-100 rounded-xl border bg-muted/20 p-3">
+                        <div className="flex flex-col gap-3">
+                          {Array.from({ length: crossScreenRows }).map((_, rowIdx) => (
+                            <div key={rowIdx} className="flex flex-row gap-3">
+                              {Array.from({ length: crossScreenCols }).map((_, colIdx) => {
+                                const currentRatio = formData.aspectRatio === "custom"
+                                  ? `${customWidth || "?"}:${customHeight || "?"}`
+                                  : formData.aspectRatio;
+
+                                // 根据比例计算尺寸，长边固定160px
+                                let gridWidth = 160;
+                                let gridHeight = 90;
+
+                                let ratioW = 16, ratioH = 9;
+                                if (formData.aspectRatio === "custom") {
+                                  ratioW = parseInt(customWidth) || 16;
+                                  ratioH = parseInt(customHeight) || 9;
+                                } else if (formData.aspectRatio) {
+                                  [ratioW, ratioH] = formData.aspectRatio.split(":").map(Number);
+                                }
+
+                                if (ratioW >= ratioH) {
+                                  // 横屏或正方形：宽度160，高度按比例
+                                  gridWidth = 160;
+                                  gridHeight = Math.round(160 / ratioW * ratioH);
+                                } else {
+                                  // 竖屏：高度160，宽度按比例
+                                  gridHeight = 160;
+                                  gridWidth = Math.round(160 / ratioH * ratioW);
+                                }
+
+                                return (
+                                  <div key={colIdx} className="flex flex-col gap-1 shrink-0">
+                                    <div
+                                      className="bg-background rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center"
+                                      style={{ width: `${gridWidth}px`, height: `${gridHeight}px` }}
+                                    >
+                                      <span className="text-xs text-primary font-bold">
+                                        {currentRatio}
+                                      </span>
+                                    </div>
+                                    <Input
+                                      placeholder="屏幕号"
+                                      value={crossScreenIds[rowIdx]?.[colIdx] || ""}
+                                      onChange={(e) => handleScreenIdChange(rowIdx, colIdx, e.target.value)}
+                                      style={{ width: `${gridWidth}px` }}
+                                      className="h-7 text-xs text-center font-mono"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="p-4 bg-primary/5 rounded-lg flex items-start gap-3 border border-primary/10">
               <Settings2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
               <p className="text-[10px] text-muted-foreground uppercase leading-relaxed font-medium tracking-wider">
@@ -921,7 +1155,7 @@ export function MediaManagement() {
               </p>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>{t("Cancel")}</Button>
             <Button onClick={handleCreateContent} className="px-8">{t("Create")}</Button>
