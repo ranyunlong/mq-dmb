@@ -62,7 +62,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { MediaItem, MediaMode, ScreenOrientation, AspectRatio, MediaStatus } from "@/types";
+import { MediaItem, MediaMode, ScreenOrientation, AspectRatio, MediaStatus, CrossScreenConfig } from "@/types";
 import { INITIAL_MEDIA_ITEMS } from "@/constants";
 
 export function MediaManagement() {

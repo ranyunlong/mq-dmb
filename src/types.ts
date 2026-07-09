@@ -45,6 +45,12 @@ export type ScreenOrientation = "landscape" | "portrait";
 export type AspectRatio = "16:9" | "4:3" | "1:1" | "9:16" | "custom";
 export type MediaStatus = "processing" | "distributing" | "failed" | "published";
 
+export interface CrossScreenConfig {
+  rows: number;
+  cols: number;
+  screenIds: string[][]; // 二维数组，存储每个网格的屏幕号
+}
+
 export interface MediaLog {
   timestamp: string;
   message: string;
@@ -63,6 +69,7 @@ export interface MediaItem {
   designId?: string; // Reference to a .design file/asset
   parentId: string | null;
   updatedAt: string;
+  crossScreenConfig?: CrossScreenConfig; // 跨屏联动配置
 }
 
 export type ScheduleStatus = "valid" | "cancelled" | "overridden" | "expired";
